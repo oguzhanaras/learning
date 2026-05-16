@@ -1,0 +1,246 @@
+Donanım zihinsel modeli netleştikçe veri yapıları ve sistem kararlarının *neden*i daha görünür olur.
+
+---
+
+**Harita: Temelden Yukarı, 5 Katman**
+
+---
+
+**Katman 1 — Bilgisayar Nasıl Düşünür (Donanım Temeli)**
+
+Durum: Done
+Öncelik: P0
+Son Güncelleme: 2026-05-03
+Bir Sonraki Odak: —
+
+Hedef:
+- CPU ve belleği sezgisel (ama doğru) bir modele oturtmak.
+- Veri yapısı seçimini cache/locality ile bağlamak.
+
+Kabul Kriteri:
+- "Array neden hızlı, linked list neden farklı trade-off" sorusunu donanım seviyesinde açıklayabilmek.
+- Stack/heap farkını basit bir bellek diyagramıyla gösterebilmek.
+
+Notlar:
+- Kriterler tamamlanınca katman `Done`; şimdilik burada kal.
+- Çalışıldı (özet): bit/byte, onluk↔ikilik, signed aralık, iki tamamlayıcı (pratik).
+- IEEE / float bit paketleme **zorunlu değil**; ihtiyaç olursa Backlog’dan açılır.
+
+Burada amaç kod yazmak değil, alttaki makinenin zihinsel modelini kurmak.
+
+- **Bit & sayı temeli** — 0/1, bit/byte; tam sayıların bellekte durduğuna dair seviye (derin matematik isteğe bağlı).
+- **CPU döngüsü** — fetch → decode → execute.
+- **RAM & adres** — bellek düz adres dizisi gibi; konum = adres.
+- **Stack vs heap** — çağrı, yerel değişken, heap tahsisi / GC sezgisi.
+- **Cache & locality** — ardışık erişim (array) vs rastgele iz (linked list) farkı.
+
+---
+
+**Katman 2 — Veri Nasıl Tutulur (Primitive'ler & Bellek)**
+
+Durum: Done
+Öncelik: P1
+Son Güncelleme: 2026-05-03
+Bir Sonraki Odak: —
+
+Hedef:
+- Primitive, referans/değer ve string davranışlarını bellek modeliyle anlamak.
+
+Kabul Kriteri:
+- Referans kopyalama etkisini bellek diyagramıyla doğru anlatabilmek.
+- String immutability ve O(n) concatenation etkisini örnekleyebilmek.
+
+Notlar:
+- Katman 1 tamamlanmadan In Progress yapma.
+
+- **Primitive tipler** — number, string, boolean'ın bellekte nasıl saklandığı. JS'te `typeof` ile gördüklerin aslında altta ne.
+- **Referans vs değer** — primitive değer kopyalanır, obje referans kopyalanır. Bunu bellek diyagramı çizerek anlamak.
+- **Pointer / referans kavramı** — JS'te doğrudan pointer yok ama her obje değişkeni aslında bir referans (pointer). C'deki pointer ile JS'teki referansın aynı fikrin farklı soyutlamaları olduğunu görmek.
+- **String internals** — string neden immutable, concatenation neden O(n), buffer/encoding (UTF-8) neden önemli.
+
+**Beklenen çıktı:** `let a = {x: 1}; let b = a; b.x = 2;` yaptığında neden `a.x` de 2 olur, bunu bellekte çizerek açıklayabilmek.
+
+---
+
+**Katman 3 — Veri Yapıları (Neden Bu Şekil)**
+
+Durum: Done
+Öncelik: P1
+Son Güncelleme: 2026-05-03
+Bir Sonraki Odak: —
+
+Hedef:
+- Temel veri yapılarını "bellek düzeni + operasyon maliyeti" ile bağlamak.
+
+Kabul Kriteri:
+- Bir problem için neden array/map/tree seçtiğini Big-O ve bellek açısından gerekçelendirebilmek.
+- En az 5 yapıda (array, map, stack, queue, tree) temel trade-off'ları net anlatabilmek.
+
+Notlar:
+- Her yapı için "hangi işlem ucuz/pahalı" mini notu tut.
+
+- **Array** — ardışık bellek bloğu. Erişim O(1), ekleme/silme (ortaya) O(n). JS'teki array aslında özel bir obje ama mental model olarak ardışık bellek düşün.
+- **Object / Hash Map** — key → hash fonksiyonu → index. Neden O(1) lookup verir, collision nedir, JS'te `Map` vs `{}` farkı.
+- **Stack** — LIFO. Call stack'in veri yapısı karşılığı. Push/pop O(1).
+- **Queue** — FIFO. Event loop'taki task queue'nun karşılığı. Enqueue/dequeue O(1).
+- **Linked List** — node'lar ve pointer'lar. Neden insertion O(1) ama erişim O(n). Array ile trade-off'u cache locality üzerinden düşün (Katman 1'e bağlanır).
+- **Tree (Binary Tree, BST)** — hiyerarşik veri. Neden arama O(log n), DOM'un neden tree olduğu. Traversal: in-order, pre-order, post-order.
+- **Graph** — node + edge. Adjacency list vs matrix. Sosyal ağ, rota bulma, dependency resolution gibi gerçek dünya karşılıkları.
+- **Set** — unique eleman garantisi. JS `Set` ile duplicate temizleme, membership check O(1).
+
+**Beklenen çıktı:** Bir iş problemi geldiğinde "burada hash map kullanmalıyım çünkü lookup O(1) lazım" diye düşünebilmek.
+
+---
+
+**Katman 4 — Algoritmik Düşünce (Pattern'ler)**
+
+Durum: In Progress
+Öncelik: P2
+Son Güncelleme: 2026-05-03
+Bir Sonraki Odak: Big-O analizi
+
+Hedef:
+- Problem görünce uygun pattern'i hızlı tanımak.
+
+Kabul Kriteri:
+- Easy/medium sorularda two pointer, sliding window, binary search, BFS/DFS ayrımını doğru yapabilmek.
+- Seçilen pattern'in zaman/alan karmaşıklığını sözlü savunabilmek.
+
+Notlar:
+- Pattern seçiminde önce veri yapısını, sonra algoritmayı karar ver.
+
+Veri yapılarını tanıdıktan sonra, üzerlerinde çalışan temel kalıplar.
+
+- **Big-O analizi** — O(1), O(log n), O(n), O(n log n), O(n²) ne hissettirir. 1000 elemanlı vs 1.000.000 elemanlı durumda farkı somut hesaplamak.
+- **İki pointer (two pointer)** — sıralı array'de iki uçtan daraltma. Sorted pair sum klasik örnek.
+- **Sliding window** — ardışık alt dizilerde max/min/toplam bulma (ör. zaman penceresi toplamları).
+- **Sıralama** — bubble sort'u anla ve unut, merge sort ve quick sort'un mantığını öğren. Divide & conquer düşünce biçimi burada başlıyor.
+- **Binary search** — sıralı veride O(log n) arama. Neden sıralı olması şart, bunu bellek modeli üzerinden düşün.
+- **Recursion** — fonksiyonun kendini çağırması. Stack frame ile bağlantısı (Katman 1'e döner). Base case olmadan patlar — neden?
+- **BFS & DFS** — tree ve graph traversal. BFS = queue kullanır (seviye seviye), DFS = stack kullanır (derinlik önce).
+- **Hashing** — hash fonksiyonu nedir, collision resolution. Şifreleme hash'i (SHA) ile veri yapısı hash'i farkı.
+- **Greedy & Dynamic Programming (giriş)** — her adımda en iyiyi seçmek vs alt problemleri cache'lemek. DP'yi derinlemesine değil, "neden var" seviyesinde anlamak yeterli bu aşamada.
+
+**Beklenen çıktı:** LeetCode easy-medium problemleri görünce hangi pattern'e uyduğunu tanıyabilmek.
+
+---
+
+**Katman 5 — Sistem Düşüncesi (Mimari Bağlam)**
+
+Durum: Not Started
+Öncelik: P2
+Son Güncelleme:
+Bir Sonraki Odak:
+
+Hedef:
+- Veri yapısı ve algoritma bilgisini sistem kararlarına taşımak.
+
+Kabul Kriteri:
+- "Bu endpoint neden yavaş?" sorusuna veri yapısı + algoritma + mimari seviyede cevap üretebilmek.
+- Time/space trade-off örnekleriyle caching/index kararlarını savunabilmek.
+
+Notlar:
+- Bu katmana geçiş için Katman 3 ve 4'te temel güven gerekiyor.
+
+Bu katman, öğrendiğin her şeyi gerçek sistem tasarımına bağlar.
+
+- **Time vs Space trade-off** — daha fazla bellek kullanarak daha hızlı sonuç (caching, hash map, önbelleklenmiş alanlar).
+- **Call stack & event loop** — Katman 1'deki stack + Katman 3'teki queue + Katman 4'teki BFS, hepsi birleşir. JS'in single-thread modelini donanımdan yukarı tam olarak anlamak.
+- **Serialization** — obje bellekte yaşar, ağ üzerinden göndermek için JSON'a (veya protobuf'a) dönüşür. Neden bu dönüşüm gerekli, maliyet nedir.
+- **Database index** — B-Tree yapısı. Katman 3'teki tree bilgisi + Katman 1'deki disk I/O anlayışı birleşir. Prisma'da `@@index` koyduğunda altta ne oluyor.
+- **Concurrency temelleri** — thread, process, async I/O farkı. NestJS'te neden her şey async, Node'un single-thread + event loop modeli neden bu kadar etkili.
+
+**Beklenen çıktı:** Teknik mülakatta "bu endpoint neden yavaş?" sorusuna veri yapısı, algoritma ve sistem seviyesinde cevap verebilmek.
+
+---
+
+**Kısa Çalışma Notu (Opsiyonel)**
+
+Kural:
+- Sadece tekrar etmeyi önleyecek kadar kısa yaz.
+- Uzun rapor yazma; 3-4 satır yeterli.
+
+Şablon:
+- Tarih:
+- Katman:
+- Bugun Neye Baktim:
+- Ne Anladim / Nerede Kaldim:
+- Sonraki Adım:
+- Durum: (Not Started/In Progress/Done)
+
+---
+
+Notlar:
+
+- Tarih: 2026-01-31
+  Katman: Katman 1
+  Bugun Neye Baktim: Harita sadeleştirildi; ana akış CPU+bellek modeli; IEEE derinliği Backlog’a alındı.
+  Ne Anladim / Nerede Kaldim: Katman 1’de hedef makine zihinsel modeli; sayı teorisi ayrı/isteğe bağlı.
+  Sonraki Adım: CPU döngüsü + adreslenebilir RAM + (kısa) stack/heap bağlamı.
+  Durum: In Progress
+
+- Tarih: 2026-05-03
+  Katman: Katman 1
+  Bugun Neye Baktim: CPU döngüsü (fetch/decode/execute), register nedir, ADD vs LOAD farkı, RAM/disk hiyerarşisi, compiler + register allocation, compiled vs interpreted vs JIT, I/O bound vs CPU bound.
+  Ne Anladim / Nerede Kaldim: Register = CPU’nun elinin altındaki hücreler; veri register’a gelince RAM’e tekrar gidilmiyor. Compiler register kararlarını veriyor. JIT sık çalışan kodu ezberliyor. Sunucu işi çoğunlukla I/O bound olduğu için dil hız farkı pratikte görünmüyor.
+  Sonraki Adım: RAM adres modeli — düz adres dizisi, byte sıralaması, pointer sezgisi.
+  Durum: In Progress
+
+- Tarih: 2026-05-03
+  Katman: Katman 1
+  Bugun Neye Baktim: RAM adres modeli, array vs linked list, pointer, stack vs heap, cache & locality.
+  Ne Anladim / Nerede Kaldim: RAM düz adres dizisi; array yan yana durduğu için cache line'la birlikte geliyor, linked list rastgele adreste olduğu için her node'da cache miss. Pointer = başka bir adresin adresi. Stack otomatik, heap GC ile yönetiliyor.
+  Sonraki Adım: Katman 2 — primitive tipler, referans vs değer, pointer/referans kavramı.
+  Durum: Done
+
+- Tarih: 2026-05-03
+  Katman: Katman 2 + Katman 3 (başlangıç)
+  Bugun Neye Baktim: Primitive vs referans tipler, string immutability, O(n) concatenation, hash map (fonksiyon, collision, {} vs Map), Stack, Queue.
+  Ne Anladim / Nerede Kaldim: Primitive kopyalanır, obje referansla paylaşılır. Hash fonksiyonu key → index çeviriyor, arama O(1). Stack LIFO bağımlılık için, Queue FIFO bağımsız sıra için.
+  Sonraki Adım: Tree, Graph, Set.
+  Durum: In Progress
+
+- Tarih: 2026-05-03
+  Katman: Katman 3
+  Bugun Neye Baktim: Tree (BST, O(log n), DOM), Graph (node/edge, directed/undirected, adjacency list vs matrix), Set (tekrarsız koleksiyon, O(1) lookup).
+  Ne Anladim / Nerede Kaldim: Tree ekleme O(log n) çünkü kaydırma yok. Graph her node'un her node'a bağlanabildiği yapı. Set = Array'in tekrarsız + hızlı lookup versiyonu, Map'e benziyor value only. Obje→Map, Array→Set ikili grupları.
+  Sonraki Adım: Katman 4 — Big-O analizi, two pointer, sliding window.
+  Durum: Done
+
+---
+
+**Yeni Çalışılacak Yerler (Backlog)**
+
+Kural:
+- Sadece calisirken karsina cikan yeni konu basliklarini ekle.
+- Kisa tut; ayrintiyi calisirken acarsin.
+
+Şablon:
+- [ ] Konu:
+  Katman:
+  Kisa Not:
+
+Backlog (örnek):
+- [ ] Konu: IEEE 754 / float iç temsil (paketleme, bias)
+  Katman: Katman 1
+  Kisa Not: İsteğe bağlı derinlik; önce CPU/RAM otursun.
+
+- [ ] Konu: CPU cache ve locality — küçük benchmark
+  Katman: Katman 1
+  Kisa Not: Array vs linked-list erişim farkını gözlemle.
+
+- [ ] Konu: Referans vs değer — bellek diyagram seti
+  Katman: Katman 2
+  Kisa Not: 3 senaryo (primitive, obje, nested obje).
+
+---
+
+**Calisma Mantigi (Minimal)**
+
+- Her zaman tek bir katmani `In Progress` tut.
+- Calisma basinda sadece `Bir Sonraki Odak` satirini belirle.
+- Calisma sonunda isterse 3-4 satirlik `Kisa Calisma Notu` ekle.
+- Yeni bir konu ciktiysa `Backlog`a tek satir olarak at.
+- Bir katmanin kabul kriterleri tamamlaninca `Done` yapip sonraki katmana gec.
+
+---
