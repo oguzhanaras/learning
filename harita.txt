@@ -96,8 +96,8 @@ Notlar:
 
 Durum: In Progress
 Öncelik: P2
-Son Güncelleme: 2026-05-03
-Bir Sonraki Odak: Big-O analizi
+Son Güncelleme: 2026-05-17
+Bir Sonraki Odak: Two pointer
 
 Hedef:
 - Problem görünce uygun pattern'i hızlı tanımak.
@@ -206,6 +206,29 @@ Notlar:
   Ne Anladim / Nerede Kaldim: Tree ekleme O(log n) çünkü kaydırma yok. Graph her node'un her node'a bağlanabildiği yapı. Set = Array'in tekrarsız + hızlı lookup versiyonu, Map'e benziyor value only. Obje→Map, Array→Set ikili grupları.
   Sonraki Adım: Katman 4 — Big-O analizi, two pointer, sliding window.
   Durum: Done
+
+- Tarih: 2026-05-17
+  Katman: Katman 4
+  Bugun Neye Baktim: Katman 3 hızlı tekrar (özellikle Queue — FIFO, iki uçlu boru). Big-O sınıfları: O(1), O(log n), O(n), O(n log n), O(n²), O(2ⁿ). 6 snippet üzerinde Big-O tahmini. Hash mantığı (hash fonksiyonu → modulo → direkt adres, collision).
+  Ne Anladim / Nerede Kaldim: Big-O = eğri, saat değil. Sabitler atılır, baskın terim kalır. İç içe döngü çarp, peş peşe topla. Hash map O(1) çünkü adresi input'tan hesaplıyor — binary search değil. Refleks: "O(1) lookup lazım mı?" → hash map.
+  Sonraki Adım: Two pointer (sıralı array'de iki uçtan daraltma).
+  Durum: In Progress
+
+- Tarih: 2026-05-17
+  Katman: Katman 4
+  Bugun Neye Baktim: Two pointer (iki uçtan daraltma + fast & slow varyantı), Sliding window (sabit ve dinamik pencere), Binary search (yarıya bölme, log n), Recursion (base case + küçültme, call stack ile bağı, faktöriyel + fibonacci O(2ⁿ) tuzağı, topla([]) alıştırması).
+  Ne Anladim / Nerede Kaldim: Two pointer = iki uç, sliding window = aralık tutarak ilerle. Binary search sıralı veri şart, her adım yarıya iner. Recursion'da küçültme = "problemi bir adım küçük versiyonun cevabıyla nasıl üretirim?". arr[0] + topla(arr.slice(1)) gibi. Pattern'lerde derinleşmeye gerek yok — sezgi + refleks yeterli, gerisi problem çözerken oturur.
+  Sonraki Adım: Sıralama (merge / quick sort — divide & conquer). Sonra BFS/DFS, greedy/DP girişi.
+  Durum: In Progress
+
+---
+
+**Dil Karari (Algoritma Calismasi)**
+
+- Algoritma calismalari **JavaScript / TypeScript** ile yapilacak.
+- TS tercih edilir (tip disiplini icin), saf JS degil.
+- Kural: AI'siz yaz. Cozemedigin yerde once 30 dk kendin dene, sonra ipucu iste — tam cozum aldirma.
+- Tetik: LeetCode'da belirli bir esige ulasinca (orn. 30 easy + 20 medium) veya is aramaya baslayinca baska bir dile gecis degerlendirilecek. Su an icin JS/TS sabit.
 
 ---
 
