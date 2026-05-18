@@ -216,8 +216,8 @@ Notlar:
 
 - Tarih: 2026-05-17
   Katman: Katman 4
-  Bugun Neye Baktim: Two pointer (iki uçtan daraltma + fast & slow varyantı), Sliding window (sabit ve dinamik pencere), Binary search (yarıya bölme, log n), Recursion (base case + küçültme, call stack ile bağı, faktöriyel + fibonacci O(2ⁿ) tuzağı, topla([]) alıştırması).
-  Ne Anladim / Nerede Kaldim: Two pointer = iki uç, sliding window = aralık tutarak ilerle. Binary search sıralı veri şart, her adım yarıya iner. Recursion'da küçültme = "problemi bir adım küçük versiyonun cevabıyla nasıl üretirim?". arr[0] + topla(arr.slice(1)) gibi. Pattern'lerde derinleşmeye gerek yok — sezgi + refleks yeterli, gerisi problem çözerken oturur.
+  Bugun Neye Baktim: Two pointer (iki uçtan daraltma + fast & slow varyantı), Sliding window (sabit ve dinamik pencere), Binary search (yarıya bölme, log n), Recursion (base case + küçültme, call stack ile bağı, faktöriyel + fibonacci O(2ⁿ) tuzağı, topla([]) alıştırması, sıradaki adam benzetmesiyle pekiştirme + saySayilari(n) ikinci alıştırma).
+  Ne Anladim / Nerede Kaldim: Two pointer = iki uç, sliding window = aralık tutarak ilerle. Binary search sıralı veri şart, her adım yarıya iner. Recursion'da güven fikri kritik: "alt çağrı bana doğru cevabı verecek, ben sadece kendi adımımı atarım". Soru büyükten küçüğe iner, cevap küçükten büyüğe geri akar. Bu 4 pattern (two pointer + sliding window + binary search + recursion) tamamen oturdu — refleks seviyesinde. Pattern'lerde derinleşmeye gerek yok, gerisi problem çözerken oturur.
   Sonraki Adım: Sıralama (merge / quick sort — divide & conquer). Sonra BFS/DFS, greedy/DP girişi.
   Durum: In Progress
 
