@@ -94,10 +94,10 @@ Notlar:
 
 **Katman 4 — Algoritmik Düşünce (Pattern'ler)**
 
-Durum: In Progress
+Durum: Done
 Öncelik: P2
 Son Güncelleme: 2026-05-17
-Bir Sonraki Odak: Two pointer
+Bir Sonraki Odak: —
 
 Hedef:
 - Problem görünce uygun pattern'i hızlı tanımak.
@@ -130,7 +130,7 @@ Veri yapılarını tanıdıktan sonra, üzerlerinde çalışan temel kalıplar.
 Durum: Not Started
 Öncelik: P2
 Son Güncelleme:
-Bir Sonraki Odak:
+Bir Sonraki Odak: Time vs Space trade-off
 
 Hedef:
 - Veri yapısı ve algoritma bilgisini sistem kararlarına taşımak.
@@ -220,6 +220,23 @@ Notlar:
   Ne Anladim / Nerede Kaldim: Two pointer = iki uç, sliding window = aralık tutarak ilerle. Binary search sıralı veri şart, her adım yarıya iner. Recursion'da güven fikri kritik: "alt çağrı bana doğru cevabı verecek, ben sadece kendi adımımı atarım". Soru büyükten küçüğe iner, cevap küçükten büyüğe geri akar. Bu 4 pattern (two pointer + sliding window + binary search + recursion) tamamen oturdu — refleks seviyesinde. Pattern'lerde derinleşmeye gerek yok, gerisi problem çözerken oturur.
   Sonraki Adım: Sıralama (merge / quick sort — divide & conquer). Sonra BFS/DFS, greedy/DP girişi.
   Durum: In Progress
+
+- Tarih: 2026-05-17
+  Katman: Katman 4
+  Bugun Neye Baktim: Sıralama (merge sort konum-bazlı bölünme + birleştirme, quick sort pivot etrafında dağıtma; örnek dizide bölünme/birleştirme adım adım), BFS/DFS (tree dolaşımı, BFS = queue seviye seviye, DFS = stack/recursion dal dal, pre/in/post-order farkları), Greedy & DP girişi (greedy local en iyi seçim — para üstü örneği ile çalıştığı/çalışmadığı durumlar; DP overlapping subproblems + optimal substructure, fibonacci memoization).
+  Ne Anladim / Nerede Kaldim: Merge sort konum-bazlı böler, quick sort değer-bazlı (pivot) ayırır. BFS yakın node lazımsa, DFS tüm yolları keşfetmek lazımsa. Greedy hızlı ama yanılabilir, DP güvenli ama maliyetli. Post-order'da bir node'un alt ağacı bitmeden başka kardeşe geçilmiyor. Katman 4 patternlerinde derinlik problem çözerken oturur, şimdilik refleks seviyesi yeterli.
+  Sonraki Adım: Katman 5 — Time vs Space trade-off.
+  Durum: Done
+
+---
+
+**Calisma Tarzi Notu (2026-05-17)**
+
+- Konular yuzeysel/sezgisel sekilde isleniyor; akademik derinlik istenmiyor.
+- Asil hedef: algoritma problem cozme + sistem tasarimi.
+- Veri yapilari ve algoritma patternlerinde "ne zaman akla gelir, kabaca nasil calisir, Big-O su nedir" yeterli.
+- Derinlik problem cozerken kendiliginden gelir — sirf calisma asamasinda zorlama yok.
+- Katman 5'te (sistem dusuncesi) daha fazla zaman ayirmak mantikli, cunku asil hedef oraya yakin.
 
 ---
 
