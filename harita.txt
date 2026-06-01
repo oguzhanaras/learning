@@ -127,10 +127,10 @@ Veri yapılarını tanıdıktan sonra, üzerlerinde çalışan temel kalıplar.
 
 **Katman 5 — Sistem Düşüncesi (Mimari Bağlam)**
 
-Durum: Not Started
+Durum: In Progress
 Öncelik: P2
-Son Güncelleme:
-Bir Sonraki Odak: Time vs Space trade-off
+Son Güncelleme: 2026-06-01
+Bir Sonraki Odak: Serialization (JSON / protobuf; bellek → ağ)
 
 Hedef:
 - Veri yapısı ve algoritma bilgisini sistem kararlarına taşımak.
@@ -141,11 +141,13 @@ Kabul Kriteri:
 
 Notlar:
 - Bu katmana geçiş için Katman 3 ve 4'te temel güven gerekiyor.
+- İşlendi (2026-06-01): Time vs Space — cache kararı (sık okuma / az yazma), invalidate sezgisi.
+- İşlendi (2026-06-01): Call stack & event loop — stack vs task kuyruk; timer (libuv/host) → kuyruk → loop → stack; V8 vs Node ayrımı.
 
 Bu katman, öğrendiğin her şeyi gerçek sistem tasarımına bağlar.
 
-- **Time vs Space trade-off** — daha fazla bellek kullanarak daha hızlı sonuç (caching, hash map, önbelleklenmiş alanlar).
-- **Call stack & event loop** — Katman 1'deki stack + Katman 3'teki queue + Katman 4'teki BFS, hepsi birleşir. JS'in single-thread modelini donanımdan yukarı tam olarak anlamak.
+- **Time vs Space trade-off** — daha fazla bellek kullanarak daha hızlı sonuç (caching, hash map, önbelleklenmiş alanlar). ✓
+- **Call stack & event loop** — Katman 1'deki stack + Katman 3'teki queue + Katman 4'teki BFS, hepsi birleşir. JS'in single-thread modelini donanımdan yukarı tam olarak anlamak. ✓
 - **Serialization** — obje bellekte yaşar, ağ üzerinden göndermek için JSON'a (veya protobuf'a) dönüşür. Neden bu dönüşüm gerekli, maliyet nedir.
 - **Database index** — B-Tree yapısı. Katman 3'teki tree bilgisi + Katman 1'deki disk I/O anlayışı birleşir. Prisma'da `@@index` koyduğunda altta ne oluyor.
 - **Concurrency temelleri** — thread, process, async I/O farkı. NestJS'te neden her şey async, Node'un single-thread + event loop modeli neden bu kadar etkili.
@@ -227,6 +229,20 @@ Notlar:
   Ne Anladim / Nerede Kaldim: Merge sort konum-bazlı böler, quick sort değer-bazlı (pivot) ayırır. BFS yakın node lazımsa, DFS tüm yolları keşfetmek lazımsa. Greedy hızlı ama yanılabilir, DP güvenli ama maliyetli. Post-order'da bir node'un alt ağacı bitmeden başka kardeşe geçilmiyor. Katman 4 patternlerinde derinlik problem çözerken oturur, şimdilik refleks seviyesi yeterli.
   Sonraki Adım: Katman 5 — Time vs Space trade-off.
   Durum: Done
+
+- Tarih: 2026-06-01
+  Katman: Katman 5
+  Bugun Neye Baktim: Time vs Space trade-off; cache örneği (yüksek okuma, düşük yazma); invalidate.
+  Ne Anladim / Nerede Kaldim: Hız için bellek/önbellek; bellekten kazanmak için tekrar hesaplama veya I/O. Cache sık okunan + az yazılan senaryoda mantıklı; güncellemede invalidate.
+  Sonraki Adım: Call stack & event loop (Katman 1 stack + Katman 3 queue + BFS bağlantısı).
+  Durum: In Progress
+
+- Tarih: 2026-06-01
+  Katman: Katman 5
+  Bugun Neye Baktim: Call stack, task kuyruk, event loop; setTimeout yolu; V8 (JS motoru) vs Node (API + libuv + loop); timer host’ta, hazır olunca kuyruğa, stack boşken loop çalıştırır.
+  Ne Anladim / Nerede Kaldim: Tüm JS stack’te çalışır; async = host’ta bekler → kuyruk → loop → stack. Timer ≠ kuyruk; donanım kuyruğa yazmaz. BFS↔queue, DFS↔call stack sezgisi.
+  Sonraki Adım: Serialization (bellekte obje → JSON/protobuf → ağ).
+  Durum: In Progress
 
 ---
 
