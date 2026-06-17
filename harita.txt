@@ -1,4 +1,4 @@
-Donanım zihinsel modeli netleştikçe veri yapıları ve sistem kararlarının *neden*i daha görünür olur.
+Donanım zihinsel modeli netleştikçe veri yapıları, tasarım prensipleri ve sistem kararlarının *neden*i daha görünür olur. Backend'de "neden bu şekilde yapıyoruz?" sorusuna cevap verebilmek için bu katmanlar önemli.
 
 ---
 
@@ -129,30 +129,48 @@ Veri yapılarını tanıdıktan sonra, üzerlerinde çalışan temel kalıplar.
 
 Durum: In Progress
 Öncelik: P2
-Son Güncelleme: 2026-06-01
-Bir Sonraki Odak: Serialization (JSON / protobuf; bellek → ağ)
+Son Güncelleme: 2026-06-17
+Bir Sonraki Odak: Database index (B-Tree)
 
 Hedef:
-- Veri yapısı ve algoritma bilgisini sistem kararlarına taşımak.
+- Backend sistem kararlarını bilinçli verebilmek (neden bu teknoloji, neden bu yaklaşım).
+- Trade-off'ları (zaman, alan, karmaşıklık, dayanıklılık) anlayarak mimari seçimi yapabilmek.
 
 Kabul Kriteri:
-- "Bu endpoint neden yavaş?" sorusuna veri yapısı + algoritma + mimari seviyede cevap üretebilmek.
-- Time/space trade-off örnekleriyle caching/index kararlarını savunabilmek.
+- "Bu endpoint neden yavaş / hata veriyor / ölçeklenmiyor?" sorusuna veri yapısı + algoritma + mimari + operasyonel seviyede cevap verebilmek.
+- Bir özellik için "REST mi GraphQL mi? Monolith mi Microservice mi? Cache mi yoksa her zaman DB mi?" diye sorduğunda mantıklı gerekçeler sunabilmek.
 
 Notlar:
 - Bu katmana geçiş için Katman 3 ve 4'te temel güven gerekiyor.
 - İşlendi (2026-06-01): Time vs Space — cache kararı (sık okuma / az yazma), invalidate sezgisi.
 - İşlendi (2026-06-01): Call stack & event loop — stack vs task kuyruk; timer (libuv/host) → kuyruk → loop → stack; V8 vs Node ayrımı.
+- İşlendi (2026-06-17): Serialization — JSON vs Protobuf, neden gerekli, CPU/boyut/versiyonlama maliyetleri.
 
-Bu katman, öğrendiğin her şeyi gerçek sistem tasarımına bağlar.
+Bu katman, öğrendiğin her şeyi gerçek backend sistem tasarımına bağlar. Burada "nasıl kod yazarım"dan çok "neden böyle yapıyoruz" sorusu ağır basar.
 
-- **Time vs Space trade-off** — daha fazla bellek kullanarak daha hızlı sonuç (caching, hash map, önbelleklenmiş alanlar). ✓
-- **Call stack & event loop** — Katman 1'deki stack + Katman 3'teki queue + Katman 4'teki BFS, hepsi birleşir. JS'in single-thread modelini donanımdan yukarı tam olarak anlamak. ✓
-- **Serialization** — obje bellekte yaşar, ağ üzerinden göndermek için JSON'a (veya protobuf'a) dönüşür. Neden bu dönüşüm gerekli, maliyet nedir.
+**Veri & Kalıcılık Katmanı**
 - **Database index** — B-Tree yapısı. Katman 3'teki tree bilgisi + Katman 1'deki disk I/O anlayışı birleşir. Prisma'da `@@index` koyduğunda altta ne oluyor.
-- **Concurrency temelleri** — thread, process, async I/O farkı. NestJS'te neden her şey async, Node'un single-thread + event loop modeli neden bu kadar etkili.
+- **Transactions & Consistency** — ACID, isolation seviyeleri (Read Committed, Repeatable Read, Serializable). Distributed transaction sorunları. Ne zaman strong consistency şart, ne zaman eventual consistency yeter?
+- **Caching Stratejileri** — Redis, local cache. Cache-aside, write-through, write-behind. Invalidation, stampede, thundering herd. Ne zaman cache, ne zaman doğrudan DB?
 
-**Beklenen çıktı:** Teknik mülakatta "bu endpoint neden yavaş?" sorusuna veri yapısı, algoritma ve sistem seviyesinde cevap verebilmek.
+**Mimari & Tasarım Prensipleri**
+- **OOP & Composition** — Inheritance vs Composition. Backend'de ne zaman class kullanmalı, ne zaman sade fonksiyon + veri? Encapsulation'ın pratikteki değeri.
+- **SOLID Prensipleri** — Single Responsibility, Open/Closed, Liskov, Interface Segregation, Dependency Inversion. Özellikle Dependency Inversion ve Inversion of Control'ün backend'deki karşılığı (DI container, test edilebilirlik).
+- **Clean Code & Layering** — Anlamlı isimlendirme, fonksiyon boyutu, sorumluluk ayrımı. Clean Architecture / Hexagonal Architecture / Layered Architecture. Kodun test edilebilir ve uzun vadede değiştirilebilir olması.
+- **API Design** — REST, GraphQL, gRPC arasındaki gerçek trade-off'lar. İyi endpoint tasarımı, versioning, pagination, filtering, error response formatı. Ne zaman hangisi mantıklı?
+
+**İletişim, Ölçek & Dayanıklılık**
+- **Concurrency temelleri** — thread, process, async I/O farkı. NestJS'te neden her şey async, Node'un single-thread + event loop modeli neden bu kadar etkili.
+- **Messaging & Event-Driven** — Queue'lar (RabbitMQ, Bull, Kafka), pub/sub. Servisler arası decoupling, eventual consistency, background job'lar. Ne zaman sync çağrı, ne zaman event?
+- **Resilience Patterns** — Retry, Circuit Breaker, Timeout, Bulkhead, Graceful Degradation. "Bu servis down olursa sistem ne yapar?"
+- **Rate Limiting & Backpressure** — API'leri korumak, kaynakları yönetmek.
+
+**Gözlemlenebilirlik & Operasyon**
+- **Observability** — Structured logging, metrics, distributed tracing (OpenTelemetry). "Production'da ne oluyor, nerede yavaşlıyor?" sorusuna cevap verebilmek.
+- **Error Handling at Scale** — Hata sınıflandırma, global error handler, retryable vs non-retryable hatalar, kullanıcıya ne gösterilir.
+
+**Beklenen çıktı:** 
+Teknik mülakatta veya ekipte "Bu özelliği nasıl tasarlamalıyız?" sorusuna mimari, veri, iletişim ve operasyonel trade-off'ları göz önünde bulundurarak mantıklı öneriler sunabilmek. "Neden" sorusunu cevaplayabilmek.
 
 ---
 
@@ -235,13 +253,27 @@ Notlar:
   Bugun Neye Baktim: Time vs Space trade-off; cache örneği (yüksek okuma, düşük yazma); invalidate.
   Ne Anladim / Nerede Kaldim: Hız için bellek/önbellek; bellekten kazanmak için tekrar hesaplama veya I/O. Cache sık okunan + az yazılan senaryoda mantıklı; güncellemede invalidate.
   Sonraki Adım: Call stack & event loop (Katman 1 stack + Katman 3 queue + BFS bağlantısı).
-  Durum: In Progress
+  Durum: Done
 
 - Tarih: 2026-06-01
   Katman: Katman 5
   Bugun Neye Baktim: Call stack, task kuyruk, event loop; setTimeout yolu; V8 (JS motoru) vs Node (API + libuv + loop); timer host’ta, hazır olunca kuyruğa, stack boşken loop çalıştırır.
   Ne Anladim / Nerede Kaldim: Tüm JS stack’te çalışır; async = host’ta bekler → kuyruk → loop → stack. Timer ≠ kuyruk; donanım kuyruğa yazmaz. BFS↔queue, DFS↔call stack sezgisi.
   Sonraki Adım: Serialization (bellekte obje → JSON/protobuf → ağ).
+  Durum: Done
+
+- Tarih: 2026-06-17
+  Katman: Katman 5
+  Bugun Neye Baktim: Serialization; JSON vs Protobuf farkı, neden bellekteki objeler direkt gönderilemez, CPU ve boyut maliyetleri, versiyonlama.
+  Ne Anladim / Nerede Kaldim: Obje bellekte pointer/referans içerir, bu yüzden ağa JSON veya binary formata çevrilmeli. JSON kolay ve okunabilir ama overhead’li (key’ler tekrar yazar). Protobuf daha küçük ve hızlı. Endpoint yavaşlığında serialization süresi önemli rol oynayabilir.
+  Sonraki Adım: Database index (B-Tree)
+  Durum: In Progress
+
+- Tarih: 2026-06-17
+  Katman: Katman 5
+  Bugun Neye Baktim: Backend ağırlıklı sistem kararları için Katman 5 haritasını genişlettim. OOP/Composition, SOLID, Clean Code/Layering, Transactions, Caching stratejileri, API design trade-off'ları (REST/GraphQL/gRPC), Messaging, Resilience pattern'leri, Observability eklendi.
+  Ne Anladim / Nerede Kaldim: Katman 5 artık sadece temel kavramlar değil, gerçek backend mimari kararlarını (neden bu yaklaşım?) destekleyecek şekilde genişledi. Sistem kararlarında veri katmanı, tasarım prensipleri, iletişim, dayanıklılık ve gözlemlenebilirlik başlıkları önemli.
+  Sonraki Adım: Database index (B-Tree) — sonra Transactions & Caching.
   Durum: In Progress
 
 ---
@@ -288,6 +320,18 @@ Backlog (örnek):
 - [ ] Konu: Referans vs değer — bellek diyagram seti
   Katman: Katman 2
   Kisa Not: 3 senaryo (primitive, obje, nested obje).
+
+- [ ] Konu: Auth & Authorization akışları (JWT, session, OAuth, RBAC vs ABAC)
+  Katman: Katman 5
+  Kisa Not: Backend'de güvenlik kararları.
+
+- [ ] Konu: Background jobs & Worker'lar (BullMQ, Agenda vs)
+  Katman: Katman 5
+  Kisa Not: Uzun süren işleri event loop'tan çıkarmak.
+
+- [ ] Konu: Circuit Breaker, Retry, Idempotency pattern'leri
+  Katman: Katman 5
+  Kisa Not: Dağıtık sistemlerde dayanıklılık.
 
 ---
 
