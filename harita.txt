@@ -129,8 +129,8 @@ Veri yapılarını tanıdıktan sonra, üzerlerinde çalışan temel kalıplar.
 
 Durum: In Progress
 Öncelik: P2
-Son Güncelleme: 2026-06-17
-Bir Sonraki Odak: Database index (B-Tree)
+Son Güncelleme: 2026-06-29
+Bir Sonraki Odak: Transactions & Consistency
 
 Hedef:
 - Backend sistem kararlarını bilinçli verebilmek (neden bu teknoloji, neden bu yaklaşım).
@@ -145,6 +145,7 @@ Notlar:
 - İşlendi (2026-06-01): Time vs Space — cache kararı (sık okuma / az yazma), invalidate sezgisi.
 - İşlendi (2026-06-01): Call stack & event loop — stack vs task kuyruk; timer (libuv/host) → kuyruk → loop → stack; V8 vs Node ayrımı.
 - İşlendi (2026-06-17): Serialization — JSON vs Protobuf, neden gerekli, CPU/boyut/versiyonlama maliyetleri.
+- İşlendi (2026-06-29): Database index (B-Tree) — sıralı yardımcı yapı → binary search → O(log n); B-Tree disk I/O için sığ ağaç (3-4 gidiş); Prisma `@@index`; yazma maliyeti trade-off'u.
 
 Bu katman, öğrendiğin her şeyi gerçek backend sistem tasarımına bağlar. Burada "nasıl kod yazarım"dan çok "neden böyle yapıyoruz" sorusu ağır basar.
 
@@ -275,6 +276,13 @@ Notlar:
   Ne Anladim / Nerede Kaldim: Katman 5 artık sadece temel kavramlar değil, gerçek backend mimari kararlarını (neden bu yaklaşım?) destekleyecek şekilde genişledi. Sistem kararlarında veri katmanı, tasarım prensipleri, iletişim, dayanıklılık ve gözlemlenebilirlik başlıkları önemli.
   Sonraki Adım: Database index (B-Tree) — sonra Transactions & Caching.
   Durum: In Progress
+
+- Tarih: 2026-06-29
+  Katman: Katman 5
+  Bugun Neye Baktim: Database index (B-Tree). Index = "değer → satırın yeri" diyen ayrı tutulan sıralı yardımcı yapı. Neden hızlı (sıralı → binary search → O(log n)). Neden düz liste değil B-Tree (disk yavaş + sayfa sayfa okur; düz listede araya ekleme O(n) kaydırma). B-Tree mantığı (node birçok sıralı değer + birçok yol → sığ ağaç → 10M kayıt 3-4 disk gidişi). Prisma `@@index`/`@id` bağlantısı. Trade-off (okuma hızlanır, yazma yavaşlar + yer kaplar).
+  Ne Anladim / Nerede Kaldim: Index sıralı olduğu için binary search yapılabiliyor. B-Tree her node'da yüzlerce parçaya böldüğü için ağaç sığ kalıyor; ekleme de ucuz çünkü sadece ilgili küçük node güncelleniyor (dolarsa böler), tablo kaydırılmıyor. Prisma `@@index([email])` yazınca altta tam bu B-Tree kuruluyor, `@id` zaten otomatik index'li. Bedeli: sadece sık aranan kolonlara index koy.
+  Sonraki Adım: Transactions & Consistency (ACID, isolation seviyeleri).
+  Durum: Done
 
 ---
 
