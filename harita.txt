@@ -129,8 +129,8 @@ Veri yapılarını tanıdıktan sonra, üzerlerinde çalışan temel kalıplar.
 
 Durum: In Progress
 Öncelik: P2
-Son Güncelleme: 2026-06-29
-Bir Sonraki Odak: Transactions & Consistency
+Son Güncelleme: 2026-07-07
+Bir Sonraki Odak: Transactions & Consistency → sonra "Derinleşme Rotası" (aşağıda)
 
 Hedef:
 - Backend sistem kararlarını bilinçli verebilmek (neden bu teknoloji, neden bu yaklaşım).
@@ -170,8 +170,76 @@ Bu katman, öğrendiğin her şeyi gerçek backend sistem tasarımına bağlar. 
 - **Observability** — Structured logging, metrics, distributed tracing (OpenTelemetry). "Production'da ne oluyor, nerede yavaşlıyor?" sorusuna cevap verebilmek.
 - **Error Handling at Scale** — Hata sınıflandırma, global error handler, retryable vs non-retryable hatalar, kullanıcıya ne gösterilir.
 
-**Beklenen çıktı:** 
+**Beklenen çıktı:**
 Teknik mülakatta veya ekipte "Bu özelliği nasıl tasarlamalıyız?" sorusuna mimari, veri, iletişim ve operasyonel trade-off'ları göz önünde bulundurarak mantıklı öneriler sunabilmek. "Neden" sorusunu cevaplayabilmek.
+
+---
+
+**Katman 5 — Derinleşme Rotası: Fat Service'ten Temiz, Test Edilebilir Mimariye**
+
+Durum: Backlog (Transactions bitince başlanacak)
+Öncelik: P2
+Eklenme: 2026-07-07
+
+Neden tek bir rota: Aşağıdaki başlıklar rastgele bir liste değil; hepsi tek bir hikâyenin
+parçaları — "her şeyi yapan tek bir Fat Service'i, test edilebilir + değiştirilebilir +
+transaction-güvenli hale nasıl getiririz?" Son başlık (Fat Service) aslında başlangıç
+noktası: çözülen hastalık o, geri kalan her şey tedavi. Her başlık bir öncekinin açtığı
+soruyu kapatır. Her konuyu **neydi → ne oldu → neden** merceğiyle çalış.
+
+Zincir (tek cümlelik harita):
+Fat Service (hastalık) → katmanla ayır → okları içeri çevir (Dependency Rule/Inversion) →
+şekle Ports & Adapters de → gerçek fişi DI ile tak → OOP araçlarıyla yaz → veri için
+Repository → transaction'ı tek elden (EntityManager) yönet → ödülünü testte al → Fat
+Service'i SRP ile böl.
+
+**1) Temel Mimari**
+- **Katmanlı Mimari (Layered Architecture)** — Presentation / Domain / Infrastructure / Common. Her katmanın tek sorumluluğu; iş kuralı (domain) DB detayını (infra) bilmez.
+- **Dependency Rule (Bağımlılık Kuralı)** — bağımlılıklar içeriye, domaine doğru akar. Domain dış katmanları tanımaz; en kararlı/kıymetli kod merkezde.
+- **Dependency Inversion** — somuta değil soyutlamaya bağımlı ol. Domain "DB'yi çağırırım" demez; kendi soyutlamasını (port) tanımlar, okun yönünü tersine çevirir (infra → domain).
+- **Hexagonal / Ports & Adapters** — üstteki fikirlerin birleşince aldığı isim/şekil. Port = domainin tanımladığı priz, Adapter = infranın taktığı fiş.
+
+**2) Dependency Injection**
+- **DI** — bağımlılığı `new` ile içeride yaratma; dışarıdan enjekte et. Somut sınıfa çakılı kalma.
+- **DI Container** — NestJS'in "hangi token istenince hangi nesneyi vereyim" haritası; wiring'i otomatik yapar.
+- **DI Token** — container'ın tanıdığı anahtar (class / string / Symbol / abstract class).
+- **interface vs abstract class token olarak** — interface derlenince runtime'da yok olur → token olamaz; abstract class runtime'da kalır → port/token için abstract class kullanılır.
+
+**3) OOP Mekaniği (araç kutusu)**
+- **abstract class** — gövdesiz metod sözleşmesi (imza var, gövde yok).
+- **implements vs extends** — sözleşmeyi yerine getirme (implements) vs davranışı miras alma (extends).
+- **Base class + kalıtım** — ortak davranışı tek yerde paylaşma.
+- **Generics `<T>`** — tek kod gövdesi, çok tip (tek Repository kodu, çok entity).
+- **Rule of Three** — bir şeyi soyutlamadan önce 3 kez tekrarlamasını bekle; erken soyutlama tuzağı.
+
+**4) Desenler**
+- **Port / Adapter deseni** — port (sözleşme) domainde, adapter (implementasyon) infrada.
+- **Repository Pattern** — veri erişimini koleksiyon gibi bir arayüz arkasına saklama.
+- **Leaky abstraction (sızdıran soyutlama)** — port metodları iş dilinde konuşmalı (`aktifKullanicilariGetir`), ORM API'sini taklit etmemeli (`createQueryBuilder`). Sızarsa soyutlama değersizleşir.
+- **Adapter pattern** — bir arayüzü başka bir arayüze çevirme (uyumsuz iki fişi bağlama).
+
+**5) Transaction** (bugün başlanan yerin devamı)
+- **Transaction** — atomiklik, "ya hepsi ya hiçbiri", commit / rollback. (ACID + isolation seviyeleri ayrıca işleniyor.)
+- **EntityManager / manager** — bir transaction'ın "eli"; tüm yazmalar aynı elden geçmeli ki tek pakette olsun.
+- **Opsiyonel manager parametresi deseni** — "manager verildiyse dış transaction'a katıl, verilmediyse kendi transaction'ımı aç." İç içe transaction'ları birleştirir.
+- **Global singleton vs DI** — manager'ı global tutmak kolay ama global state test düşmanı (paylaşılan, izole edilemeyen durum). DI ile enjekte et.
+- **Shim / köprü deseni** — kademeli geçişte eskiyi kırmadan yeniyi ekleme; iki dünyayı geçici köprüyle bağlama.
+
+**6) Test** (mimarinin asıl ödülü)
+- **Test double / Mock / Stub / Spy** — sahte bağımlılık türleri; port sayesinde gerçeğin yerine sahtesini takarsın.
+- **Auto-mocking** — sağlanmayan bağımlılıkları otomatik sahteleme.
+- **Pozisyonel vs isimli/token bağımlılık** — pozisyona güvenen testler sıra değişince kırılır; token'a bağlananlar dayanıklı.
+- **Test piramidi** — tabanda çok hızlı unit, tepede az integration/e2e.
+- **Unit vs Integration vs E2E** — hangisi neyi test eder (izole mantık / gerçek bileşenler / uçtan uca akış).
+- **Testcontainers** — testte gerçek, tek kullanımlık DB container'ı; mock'un yalanını yakalar.
+- **Fake green (yalancı yeşil)** — mock gerçeğin sözleşmesini korumazsa test yeşil ama üretim kırık.
+- **Deterministik eşzamanlılık testi** — `sleep` yerine promise barrier ile yarış (race) senaryosunu güvenilir tetikleme. (Isolation konusuna bağlanır.)
+
+**7) Fat Service** (varış noktası)
+- **Fat Service / God Object** — her şeyi yapan şişkin servisin parçalara ayrılması.
+- **Single Responsibility Principle** — her parçanın değişmek için tek bir nedeni olsun.
+
+**Beklenen çıktı:** Bir NestJS projesinde "bu servis neden test edilemiyor / neden her değişiklikte başka yer kırılıyor / transaction'ı nasıl doğru yönetirim" sorularına mimari + DI + test seviyesinde cevap verebilmek; Fat Service'i güvenle parçalayabilmek.
 
 ---
 
@@ -283,6 +351,13 @@ Notlar:
   Ne Anladim / Nerede Kaldim: Index sıralı olduğu için binary search yapılabiliyor. B-Tree her node'da yüzlerce parçaya böldüğü için ağaç sığ kalıyor; ekleme de ucuz çünkü sadece ilgili küçük node güncelleniyor (dolarsa böler), tablo kaydırılmıyor. Prisma `@@index([email])` yazınca altta tam bu B-Tree kuruluyor, `@id` zaten otomatik index'li. Bedeli: sadece sık aranan kolonlara index koy.
   Sonraki Adım: Transactions & Consistency (ACID, isolation seviyeleri).
   Durum: Done
+
+- Tarih: 2026-07-07
+  Katman: Katman 5
+  Bugun Neye Baktim: Transactions — problem (yarıda kalan iş / para transferi), "ya hep ya hiç", COMMIT/ROLLBACK, ACID dört harf (Atomicity, Consistency, Isolation, Durability) günlük örneklerle. Ayrıca "Derinleşme Rotası" eklendi (Fat Service → Layered/DI/Ports & Adapters → Transaction → Test → SRP).
+  Ne Anladim / Nerede Kaldim: Transaction = birden çok yazmayı bölünmez tek iş gibi ele almak (A). C kuralları korur (bakiye eksiye düşmez), I eşzamanlı işlemleri yalıtır, D commit sonrası kalıcılık. A/C/D sezgisel; asıl et Isolation seviyelerinde. ACID oturdu, isolation seviyelerine (dirty / non-repeatable / phantom read → Read Committed / Repeatable Read / Serializable) henüz girmedik.
+  Sonraki Adım: Isolation seviyeleri; sonra Derinleşme Rotası (Katmanlı mimari + Dependency Rule).
+  Durum: In Progress
 
 ---
 
