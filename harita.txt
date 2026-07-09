@@ -130,7 +130,7 @@ Veri yapılarını tanıdıktan sonra, üzerlerinde çalışan temel kalıplar.
 Durum: In Progress
 Öncelik: P2
 Son Güncelleme: 2026-07-07
-Bir Sonraki Odak: Transactions & Consistency → sonra "Derinleşme Rotası" (aşağıda)
+Bir Sonraki Odak: Derinleşme Rotası (aşağıda) — 1) Katmanlı Mimari + Dependency Rule
 
 Hedef:
 - Backend sistem kararlarını bilinçli verebilmek (neden bu teknoloji, neden bu yaklaşım).
@@ -146,6 +146,7 @@ Notlar:
 - İşlendi (2026-06-01): Call stack & event loop — stack vs task kuyruk; timer (libuv/host) → kuyruk → loop → stack; V8 vs Node ayrımı.
 - İşlendi (2026-06-17): Serialization — JSON vs Protobuf, neden gerekli, CPU/boyut/versiyonlama maliyetleri.
 - İşlendi (2026-06-29): Database index (B-Tree) — sıralı yardımcı yapı → binary search → O(log n); B-Tree disk I/O için sığ ağaç (3-4 gidiş); Prisma `@@index`; yazma maliyeti trade-off'u.
+- İşlendi (2026-07-07): Transactions & Consistency — ACID (ya hep ya hiç, commit/rollback); isolation seviyeleri (dirty / non-repeatable / phantom read → Read Uncommitted / Committed / Repeatable Read / Serializable + trade-off + `SELECT FOR UPDATE` cerrahi kilit); kod tarafı (izolasyon ayarını transaction açılışında ver; `EntityManager` = `BEGIN` açık tek bağlantıya kilitli "el"; opsiyonel manager parametresi deseni; global singleton yerine DI); strong vs eventual consistency ("2 sn eski yaralar mı?").
 
 Bu katman, öğrendiğin her şeyi gerçek backend sistem tasarımına bağlar. Burada "nasıl kod yazarım"dan çok "neden böyle yapıyoruz" sorusu ağır basar.
 
@@ -354,10 +355,10 @@ Notlar:
 
 - Tarih: 2026-07-07
   Katman: Katman 5
-  Bugun Neye Baktim: Transactions — problem (yarıda kalan iş / para transferi), "ya hep ya hiç", COMMIT/ROLLBACK, ACID dört harf (Atomicity, Consistency, Isolation, Durability) günlük örneklerle. Ayrıca "Derinleşme Rotası" eklendi (Fat Service → Layered/DI/Ports & Adapters → Transaction → Test → SRP).
-  Ne Anladim / Nerede Kaldim: Transaction = birden çok yazmayı bölünmez tek iş gibi ele almak (A). C kuralları korur (bakiye eksiye düşmez), I eşzamanlı işlemleri yalıtır, D commit sonrası kalıcılık. A/C/D sezgisel; asıl et Isolation seviyelerinde. ACID oturdu, isolation seviyelerine (dirty / non-repeatable / phantom read → Read Committed / Repeatable Read / Serializable) henüz girmedik.
-  Sonraki Adım: Isolation seviyeleri; sonra Derinleşme Rotası (Katmanlı mimari + Dependency Rule).
-  Durum: In Progress
+  Bugun Neye Baktim: Transactions & Consistency (baştan sona). Problem (yarıda kalan iş / para transferi), "ya hep ya hiç", COMMIT/ROLLBACK, ACID (A/C/I/D) günlük örneklerle. Isolation: 3 anomali (dirty / non-repeatable / phantom read) + 4 seviye merdiveni (Read Uncommitted→Committed→Repeatable Read→Serializable) + trade-off + SELECT FOR UPDATE. Kod tarafı: izolasyon ayarını nerede veriyorsun (raw SQL / TypeORM / Prisma), manager (EntityManager) nedir, opsiyonel manager parametresi deseni. Strong vs eventual consistency. Ayrıca "Derinleşme Rotası" eklendi (Fat Service → Layered/DI/Ports & Adapters → Transaction → Test → SRP).
+  Ne Anladim / Nerede Kaldim: Transaction = çok yazmayı bölünmez tek iş gibi ele almak (A); C kural korur, I yalıtır, D kalıcı. Isolation bir "kadran": yukarı çıktıkça güvenli ama yavaş + deadlock; seviyeyi "beni hangi anomali yaralar?" diye seçersin ya da tekil yeri SELECT FOR UPDATE ile kilitlersin. İzolasyon ayarı = transaction açılışında verilen bir argüman (gövde aynı kalır). manager = BEGIN'in açık olduğu TEK bağlantıya kilitli EntityManager; aynı manager'ı herkese vermek = herkesi aynı transaction'a sokmak; default repo her sorguda başka bağlantı kapar → dışarıda kalır. Opsiyonel manager: "verildiyse dış transaction'a katıl, verilmediyse kendi transaction'ımı aç." Strong = okuyan asla eski görmez (güvenli, yavaş), eventual = hemen tamam, kopyalar sonra yetişir (hızlı, bir an eski). Seçim: "bu veriyi 2 sn eski görmek birini yaralar mı?" İki farklı Consistency var: ACID-C (tek DB, kural) vs dağıtık (kopyalar ne zaman aynılaşır).
+  Sonraki Adım: Derinleşme Rotası — 1) Katmanlı Mimari + Dependency Rule.
+  Durum: Done
 
 ---
 
