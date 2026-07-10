@@ -129,8 +129,8 @@ Veri yapılarını tanıdıktan sonra, üzerlerinde çalışan temel kalıplar.
 
 Durum: In Progress
 Öncelik: P2
-Son Güncelleme: 2026-07-07
-Bir Sonraki Odak: Derinleşme Rotası (aşağıda) — 1) Katmanlı Mimari + Dependency Rule
+Son Güncelleme: 2026-07-10
+Bir Sonraki Odak: Derinleşme Rotası — 3) OOP Mekaniği (abstract class, implements/extends, generics, Rule of Three)
 
 Hedef:
 - Backend sistem kararlarını bilinçli verebilmek (neden bu teknoloji, neden bu yaklaşım).
@@ -147,6 +147,7 @@ Notlar:
 - İşlendi (2026-06-17): Serialization — JSON vs Protobuf, neden gerekli, CPU/boyut/versiyonlama maliyetleri.
 - İşlendi (2026-06-29): Database index (B-Tree) — sıralı yardımcı yapı → binary search → O(log n); B-Tree disk I/O için sığ ağaç (3-4 gidiş); Prisma `@@index`; yazma maliyeti trade-off'u.
 - İşlendi (2026-07-07): Transactions & Consistency — ACID (ya hep ya hiç, commit/rollback); isolation seviyeleri (dirty / non-repeatable / phantom read → Read Uncommitted / Committed / Repeatable Read / Serializable + trade-off + `SELECT FOR UPDATE` cerrahi kilit); kod tarafı (izolasyon ayarını transaction açılışında ver; `EntityManager` = `BEGIN` açık tek bağlantıya kilitli "el"; opsiyonel manager parametresi deseni; global singleton yerine DI); strong vs eventual consistency ("2 sn eski yaralar mı?").
+- İşlendi (2026-07-10): Derinleşme Rotası G1+G2 — Katmanlı mimari (Presentation/Domain/Infrastructure + Common kenarda; garson/aşçı/kiler benzetmesi) + Dependency Rule (oklar içeri, domaine) + Dependency Inversion (port'u domaine koy → ok tersine döner) + Ports & Adapters/Hexagonal. DI (new değil, constructor'dan enjekte), DI Container (otomatik wiring / depo görevlisi), DI Token (etiket), interface vs abstract class (interface runtime'da buharlaşır → port = abstract class).
 
 Bu katman, öğrendiğin her şeyi gerçek backend sistem tasarımına bağlar. Burada "nasıl kod yazarım"dan çok "neden böyle yapıyoruz" sorusu ağır basar.
 
@@ -178,9 +179,10 @@ Teknik mülakatta veya ekipte "Bu özelliği nasıl tasarlamalıyız?" sorusuna 
 
 **Katman 5 — Derinleşme Rotası: Fat Service'ten Temiz, Test Edilebilir Mimariye**
 
-Durum: Backlog (Transactions bitince başlanacak)
+Durum: In Progress (G1-G2 işlendi 2026-07-10; sıradaki G3)
 Öncelik: P2
 Eklenme: 2026-07-07
+Son Güncelleme: 2026-07-10
 
 Neden tek bir rota: Aşağıdaki başlıklar rastgele bir liste değil; hepsi tek bir hikâyenin
 parçaları — "her şeyi yapan tek bir Fat Service'i, test edilebilir + değiştirilebilir +
@@ -194,19 +196,19 @@ Fat Service (hastalık) → katmanla ayır → okları içeri çevir (Dependency
 Repository → transaction'ı tek elden (EntityManager) yönet → ödülünü testte al → Fat
 Service'i SRP ile böl.
 
-**1) Temel Mimari**
+**1) Temel Mimari** ✓ işlendi (2026-07-10)
 - **Katmanlı Mimari (Layered Architecture)** — Presentation / Domain / Infrastructure / Common. Her katmanın tek sorumluluğu; iş kuralı (domain) DB detayını (infra) bilmez.
 - **Dependency Rule (Bağımlılık Kuralı)** — bağımlılıklar içeriye, domaine doğru akar. Domain dış katmanları tanımaz; en kararlı/kıymetli kod merkezde.
 - **Dependency Inversion** — somuta değil soyutlamaya bağımlı ol. Domain "DB'yi çağırırım" demez; kendi soyutlamasını (port) tanımlar, okun yönünü tersine çevirir (infra → domain).
 - **Hexagonal / Ports & Adapters** — üstteki fikirlerin birleşince aldığı isim/şekil. Port = domainin tanımladığı priz, Adapter = infranın taktığı fiş.
 
-**2) Dependency Injection**
+**2) Dependency Injection** ✓ işlendi (2026-07-10)
 - **DI** — bağımlılığı `new` ile içeride yaratma; dışarıdan enjekte et. Somut sınıfa çakılı kalma.
 - **DI Container** — NestJS'in "hangi token istenince hangi nesneyi vereyim" haritası; wiring'i otomatik yapar.
 - **DI Token** — container'ın tanıdığı anahtar (class / string / Symbol / abstract class).
 - **interface vs abstract class token olarak** — interface derlenince runtime'da yok olur → token olamaz; abstract class runtime'da kalır → port/token için abstract class kullanılır.
 
-**3) OOP Mekaniği (araç kutusu)**
+**3) OOP Mekaniği (araç kutusu)** ← sıradaki
 - **abstract class** — gövdesiz metod sözleşmesi (imza var, gövde yok).
 - **implements vs extends** — sözleşmeyi yerine getirme (implements) vs davranışı miras alma (extends).
 - **Base class + kalıtım** — ortak davranışı tek yerde paylaşma.
@@ -359,6 +361,13 @@ Notlar:
   Ne Anladim / Nerede Kaldim: Transaction = çok yazmayı bölünmez tek iş gibi ele almak (A); C kural korur, I yalıtır, D kalıcı. Isolation bir "kadran": yukarı çıktıkça güvenli ama yavaş + deadlock; seviyeyi "beni hangi anomali yaralar?" diye seçersin ya da tekil yeri SELECT FOR UPDATE ile kilitlersin. İzolasyon ayarı = transaction açılışında verilen bir argüman (gövde aynı kalır). manager = BEGIN'in açık olduğu TEK bağlantıya kilitli EntityManager; aynı manager'ı herkese vermek = herkesi aynı transaction'a sokmak; default repo her sorguda başka bağlantı kapar → dışarıda kalır. Opsiyonel manager: "verildiyse dış transaction'a katıl, verilmediyse kendi transaction'ımı aç." Strong = okuyan asla eski görmez (güvenli, yavaş), eventual = hemen tamam, kopyalar sonra yetişir (hızlı, bir an eski). Seçim: "bu veriyi 2 sn eski görmek birini yaralar mı?" İki farklı Consistency var: ACID-C (tek DB, kural) vs dağıtık (kopyalar ne zaman aynılaşır).
   Sonraki Adım: Derinleşme Rotası — 1) Katmanlı Mimari + Dependency Rule.
   Durum: Done
+
+- Tarih: 2026-07-10
+  Katman: Katman 5 (Derinleşme Rotası)
+  Bugun Neye Baktim: Grup 1 (Temel Mimari) + Grup 2 (Dependency Injection). Katmanlı mimari (Presentation/Domain/Infrastructure + Common kenarda; garson/aşçı/kiler/aletler benzetmesi), Dependency Rule (oklar içeri, domaine), Dependency Inversion (port'u domaine koy → ok tersine döner), Ports & Adapters/Hexagonal (çıkan şeklin adı). DI (new yerine constructor'dan enjekte), DI Container (otomatik montaj/depo görevlisi), DI Token (etiket), interface vs abstract class.
+  Ne Anladim / Nerede Kaldim: Fat Service hastalık; tedavi = katmanla böl + oku içeri çevir. Domain KARAR verir ("email tekil mi", "bakiye yeter mi"), Infra İCRA eder (gerçek DB'ye gidiş + @Entity tablo tanımı). Ok içeri bakmalı ama domain DB'ye muhtaç → çelişkiyi port/adapter çözer: sözleşme (port) domainde, implementasyon (adapter) infrada, ok döner. Bu yüzden Ports & Adapters ayrı mimari değil, katmanlı mimarinin "oklar gerçekten içeri" hali. new = domaini somuta çakar → yerine DI: dışarıdan enjekte, kural korunur + test kolaylaşır. Container token'a bakıp otomatik takar. Port abstract class çünkü interface runtime'da yok olur, token olamaz (abstract class hem tip hem token). 3 akış katmanı + Common yan çekmece.
+  Sonraki Adim: Grup 3 — OOP Mekaniği (abstract class, implements vs extends, base class + kalıtım, generics, Rule of Three).
+  Durum: In Progress
 
 ---
 
