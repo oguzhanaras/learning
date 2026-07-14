@@ -130,7 +130,7 @@ Veri yapılarını tanıdıktan sonra, üzerlerinde çalışan temel kalıplar.
 Durum: In Progress
 Öncelik: P2
 Son Güncelleme: 2026-07-10
-Bir Sonraki Odak: Derinleşme Rotası — 3) OOP Mekaniği (abstract class, implements/extends, generics, Rule of Three)
+Bir Sonraki Odak: Derinleşme Rotası — 4) Desenler (Port/Adapter, Repository Pattern, Leaky Abstraction, Adapter Pattern)
 
 Hedef:
 - Backend sistem kararlarını bilinçli verebilmek (neden bu teknoloji, neden bu yaklaşım).
@@ -148,6 +148,7 @@ Notlar:
 - İşlendi (2026-06-29): Database index (B-Tree) — sıralı yardımcı yapı → binary search → O(log n); B-Tree disk I/O için sığ ağaç (3-4 gidiş); Prisma `@@index`; yazma maliyeti trade-off'u.
 - İşlendi (2026-07-07): Transactions & Consistency — ACID (ya hep ya hiç, commit/rollback); isolation seviyeleri (dirty / non-repeatable / phantom read → Read Uncommitted / Committed / Repeatable Read / Serializable + trade-off + `SELECT FOR UPDATE` cerrahi kilit); kod tarafı (izolasyon ayarını transaction açılışında ver; `EntityManager` = `BEGIN` açık tek bağlantıya kilitli "el"; opsiyonel manager parametresi deseni; global singleton yerine DI); strong vs eventual consistency ("2 sn eski yaralar mı?").
 - İşlendi (2026-07-10): Derinleşme Rotası G1+G2 — Katmanlı mimari (Presentation/Domain/Infrastructure + Common kenarda; garson/aşçı/kiler benzetmesi) + Dependency Rule (oklar içeri, domaine) + Dependency Inversion (port'u domaine koy → ok tersine döner) + Ports & Adapters/Hexagonal. DI (new değil, constructor'dan enjekte), DI Container (otomatik wiring / depo görevlisi), DI Token (etiket), interface vs abstract class (interface runtime'da buharlaşır → port = abstract class).
+- İşlendi (2026-07-10): Derinleşme Rotası G3 (OOP Mekaniği) — abstract class (gövdesiz sözleşme, new'lenemez, yarı dolu olabilir), implements (şekil sözü, miras yok) vs extends (gerçek davranış mirası), base class + kalıtım (ortak davranış tek yerde = DRY), generics `<T>` (aynı kod / farklı tip; T = "Type" için isim/convention, değer yerine tip alan parametre; any-vs-tekrar ikilemini çözer + tip güvenliği korunur), Rule of Three (3 kez tekrar etmeden soyutlama; yanlış soyutlama tekrardan pahalı; kasıtlı mimari dikişler/port muaf).
 
 Bu katman, öğrendiğin her şeyi gerçek backend sistem tasarımına bağlar. Burada "nasıl kod yazarım"dan çok "neden böyle yapıyoruz" sorusu ağır basar.
 
@@ -179,7 +180,7 @@ Teknik mülakatta veya ekipte "Bu özelliği nasıl tasarlamalıyız?" sorusuna 
 
 **Katman 5 — Derinleşme Rotası: Fat Service'ten Temiz, Test Edilebilir Mimariye**
 
-Durum: In Progress (G1-G2 işlendi 2026-07-10; sıradaki G3)
+Durum: In Progress (G1-G3 işlendi 2026-07-10; sıradaki G4)
 Öncelik: P2
 Eklenme: 2026-07-07
 Son Güncelleme: 2026-07-10
@@ -208,14 +209,14 @@ Service'i SRP ile böl.
 - **DI Token** — container'ın tanıdığı anahtar (class / string / Symbol / abstract class).
 - **interface vs abstract class token olarak** — interface derlenince runtime'da yok olur → token olamaz; abstract class runtime'da kalır → port/token için abstract class kullanılır.
 
-**3) OOP Mekaniği (araç kutusu)** ← sıradaki
+**3) OOP Mekaniği (araç kutusu)** ✓ işlendi (2026-07-10)
 - **abstract class** — gövdesiz metod sözleşmesi (imza var, gövde yok).
 - **implements vs extends** — sözleşmeyi yerine getirme (implements) vs davranışı miras alma (extends).
 - **Base class + kalıtım** — ortak davranışı tek yerde paylaşma.
 - **Generics `<T>`** — tek kod gövdesi, çok tip (tek Repository kodu, çok entity).
 - **Rule of Three** — bir şeyi soyutlamadan önce 3 kez tekrarlamasını bekle; erken soyutlama tuzağı.
 
-**4) Desenler**
+**4) Desenler** ← sıradaki
 - **Port / Adapter deseni** — port (sözleşme) domainde, adapter (implementasyon) infrada.
 - **Repository Pattern** — veri erişimini koleksiyon gibi bir arayüz arkasına saklama.
 - **Leaky abstraction (sızdıran soyutlama)** — port metodları iş dilinde konuşmalı (`aktifKullanicilariGetir`), ORM API'sini taklit etmemeli (`createQueryBuilder`). Sızarsa soyutlama değersizleşir.
@@ -364,9 +365,9 @@ Notlar:
 
 - Tarih: 2026-07-10
   Katman: Katman 5 (Derinleşme Rotası)
-  Bugun Neye Baktim: Grup 1 (Temel Mimari) + Grup 2 (Dependency Injection). Katmanlı mimari (Presentation/Domain/Infrastructure + Common kenarda; garson/aşçı/kiler/aletler benzetmesi), Dependency Rule (oklar içeri, domaine), Dependency Inversion (port'u domaine koy → ok tersine döner), Ports & Adapters/Hexagonal (çıkan şeklin adı). DI (new yerine constructor'dan enjekte), DI Container (otomatik montaj/depo görevlisi), DI Token (etiket), interface vs abstract class.
-  Ne Anladim / Nerede Kaldim: Fat Service hastalık; tedavi = katmanla böl + oku içeri çevir. Domain KARAR verir ("email tekil mi", "bakiye yeter mi"), Infra İCRA eder (gerçek DB'ye gidiş + @Entity tablo tanımı). Ok içeri bakmalı ama domain DB'ye muhtaç → çelişkiyi port/adapter çözer: sözleşme (port) domainde, implementasyon (adapter) infrada, ok döner. Bu yüzden Ports & Adapters ayrı mimari değil, katmanlı mimarinin "oklar gerçekten içeri" hali. new = domaini somuta çakar → yerine DI: dışarıdan enjekte, kural korunur + test kolaylaşır. Container token'a bakıp otomatik takar. Port abstract class çünkü interface runtime'da yok olur, token olamaz (abstract class hem tip hem token). 3 akış katmanı + Common yan çekmece.
-  Sonraki Adim: Grup 3 — OOP Mekaniği (abstract class, implements vs extends, base class + kalıtım, generics, Rule of Three).
+  Bugun Neye Baktim: Grup 1-3. Katmanlı mimari (Presentation/Domain/Infrastructure + Common kenarda; garson/aşçı/kiler/aletler benzetmesi), Dependency Rule (oklar içeri, domaine), Dependency Inversion (port'u domaine koy → ok tersine döner), Ports & Adapters/Hexagonal (çıkan şeklin adı). DI (new yerine constructor'dan enjekte), DI Container (otomatik montaj/depo görevlisi), DI Token (etiket), interface vs abstract class.
+  Ne Anladim / Nerede Kaldim: Fat Service hastalık; tedavi = katmanla böl + oku içeri çevir. Domain KARAR verir ("email tekil mi", "bakiye yeter mi"), Infra İCRA eder (gerçek DB'ye gidiş + @Entity tablo tanımı). Ok içeri bakmalı ama domain DB'ye muhtaç → çelişkiyi port/adapter çözer: sözleşme (port) domainde, implementasyon (adapter) infrada, ok döner. Bu yüzden Ports & Adapters ayrı mimari değil, katmanlı mimarinin "oklar gerçekten içeri" hali. new = domaini somuta çakar → yerine DI: dışarıdan enjekte, kural korunur + test kolaylaşır. Container token'a bakıp otomatik takar. Port abstract class çünkü interface runtime'da yok olur, token olamaz (abstract class hem tip hem token). 3 akış katmanı + Common yan çekmece. G3 (OOP aletleri): abstract class = gövdesiz sözleşme; implements (şekil sözü) vs extends (davranış mirası); base class ortak kodu DRY tutar; generics `<T>` = değer yerine tip alan parametre (T sadece "Type" için isim), any/tekrar ikilemini çözerken tip güvenliğini korur; Rule of Three = 3 kez tekrar etmeden soyutlama, yanlış soyutlama tekrardan pahalı (kasıtlı dikişler/port muaf).
+  Sonraki Adim: Grup 4 — Desenler (Port/Adapter, Repository Pattern, Leaky Abstraction, Adapter Pattern).
   Durum: In Progress
 
 ---
