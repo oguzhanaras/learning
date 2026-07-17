@@ -248,6 +248,40 @@ Service'i SRP ile böl.
 
 ---
 
+**Katman 5 — Ağ & İşletim Sistemi Temelleri (Donanıma Yakın Sistem Düşüncesi)**
+
+Durum: Backlog (Derinleşme Rotası'yla paralel ya da sonrası)
+Öncelik: P2
+Eklenme: 2026-07-10
+
+Neden: "Bağlantı açmak pahalı", "socket", "havuz tükenmesi", "handshake" gibi kavramlar
+çalışırken sürekli çıkıyor. Bunlar donanıma/işletim sistemine yakın "sistem düşüncesi"
+başlıkları — Katman 5'in tam göbeği. Akademik protokol derinliği DEĞİL; "ne zaman aklıma
+gelir, kabaca nasıl çalışır, neden önemli" seviyesi (Çalışma Tarzı Notu'na uygun). Her başlık
+zaten öğrendiğin bir şeye bağlanıyor.
+
+**A) Ağ Temelleri**
+- **TCP/IP & socket** — socket nedir, port, 3-way handshake; bağlantı kurmak neden "pahalı". → bağlantı havuzu konusunun temeli (bugün konuşuldu).
+- **TLS / HTTPS** — şifreli bağlantı, TLS handshake (ekstra gidiş-geliş = gecikme), sertifika/CA. → ortamdaki proxy + CA bundle buraya oturur.
+- **HTTP/1.1 → HTTP/2 → HTTP/3** — keep-alive (bağlantı tekrar kullanımı = havuz fikri), multiplexing, head-of-line blocking.
+- **DNS** — isim → IP çözümü, caching, propagation gecikmesi. → eventual consistency'nin canlı örneği.
+- **Bir isteğin tam yolculuğu** — URL yazınca ne oluyor: DNS → TCP → TLS → HTTP → cevap. Hepsini bağlayan tur.
+
+**B) İşletim Sistemi / Süreç Temelleri**
+- **Process vs Thread** — (rotadaki Concurrency başlığıyla birleşir) bellek paylaşımı, izolasyon.
+- **File descriptor & socket** — her bağlantı = bir FD; "too many open files" hatası neden. → pool exhaustion'ın OS tarafı.
+- **Blocking vs non-blocking I/O, epoll/kqueue (libuv)** — event loop'un ALTINDAKİ mekanizma. → Call stack & event loop (işlendi) buraya iner.
+- **Buffer & stream** — veriyi parça parça işlemek, OS seviyesinde backpressure. → Serialization (işlendi) + büyük veri akışı.
+
+Öğrendiklerine köprüler:
+- Havuz ↔ TCP handshake maliyeti (bugün) · Pool exhaustion ↔ file descriptor limiti
+- DNS propagation ↔ eventual consistency · HTTP keep-alive ↔ bağlantı tekrar kullanımı (pooling)
+- Event loop (işlendi) ↔ non-blocking I/O / epoll · Serialization (işlendi) ↔ socket'ten geçen ham byte'lar
+
+**Beklenen çıktı:** "Endpoint neden yavaş / neden bağlantı hatası alıyorum / bu gecikme nereden" sorularına ağ + OS seviyesinde sezgisel cevap verebilmek; socket / handshake / FD / keep-alive kavramlarını rahat kullanabilmek.
+
+---
+
 **Kısa Çalışma Notu (Opsiyonel)**
 
 Kural:
