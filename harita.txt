@@ -130,7 +130,7 @@ Veri yapılarını tanıdıktan sonra, üzerlerinde çalışan temel kalıplar.
 Durum: In Progress
 Öncelik: P2
 Son Güncelleme: 2026-07-10
-Bir Sonraki Odak: Derinleşme Rotası — 6) Test (tek tek detaylı: test double, auto-mock, piramit, testcontainers, fake green, eşzamanlılık testi)
+Bir Sonraki Odak: Derinleşme Rotası — 7) Fat Service + SRP (son grup: sentez / varış noktası)
 
 Hedef:
 - Backend sistem kararlarını bilinçli verebilmek (neden bu teknoloji, neden bu yaklaşım).
@@ -148,6 +148,7 @@ Notlar:
 - İşlendi (2026-06-29): Database index (B-Tree) — sıralı yardımcı yapı → binary search → O(log n); B-Tree disk I/O için sığ ağaç (3-4 gidiş); Prisma `@@index`; yazma maliyeti trade-off'u.
 - İşlendi (2026-07-07): Transactions & Consistency — ACID (ya hep ya hiç, commit/rollback); isolation seviyeleri (dirty / non-repeatable / phantom read → Read Uncommitted / Committed / Repeatable Read / Serializable + trade-off + `SELECT FOR UPDATE` cerrahi kilit); kod tarafı (izolasyon ayarını transaction açılışında ver; `EntityManager` = `BEGIN` açık tek bağlantıya kilitli "el"; opsiyonel manager parametresi deseni; global singleton yerine DI); strong vs eventual consistency ("2 sn eski yaralar mı?").
 - İşlendi (2026-07-10): Derinleşme Rotası G1+G2 — Katmanlı mimari (Presentation/Domain/Infrastructure + Common kenarda; garson/aşçı/kiler benzetmesi) + Dependency Rule (oklar içeri, domaine) + Dependency Inversion (port'u domaine koy → ok tersine döner) + Ports & Adapters/Hexagonal. DI (new değil, constructor'dan enjekte), DI Container (otomatik wiring / depo görevlisi), DI Token (etiket), interface vs abstract class (interface runtime'da buharlaşır → port = abstract class).
+- İşlendi (2026-07-10): Derinleşme Rotası G6 (Test, tek tek detaylı) — test double taksonomisi (dummy=yer doldur / stub=hazır cevap besle→ÇIKTIYA bak / spy=cevap+kayıt / mock=etkileşimi doğrula→ÇAĞRIYA bak / fake=hafif gerçek in-memory); port+DI test double'ı mümkün kılar. auto-mocking (vermediğini otomatik sahtele, sen sadece önemliyi ayarla). pozisyonel vs token bağımlılık (sıraya güvenen test refactor'da sessizce kırılır → token'a/isme göre çöz, "3. ev" değil "adres"). test piramidi (çok unit / az integration / az e2e; ters = dondurma külahı) + unit/integration/e2e (ne kadarı gerçek). testcontainers (gerçek + tek kullanımlık + izole DB container; ortak DB = kirli, SQLite = yalan). fake green (mock gerçeğin sözleşmesini korumazsa test yeşil / üretim kırık → integration + contract test ile dürüst tut). deterministik eşzamanlılık testi (sleep = flaky/yavaş/garantisiz → promise barrier ile iç içe geçmeyi kurgula; isolation'a geri bağlanır, çember kapanır).
 - İşlendi (2026-07-10): Derinleşme Rotası G5 (Transaction, tek tek detaylı) — (1) pratik: lifecycle (BEGIN→iş→COMMIT/ROLLBACK→release), transaction sınırı use-case seviyesinde açılır (repo'da değil; "bir iş = bir fiş"), kısa tut (bağlantı + kilit tutar; yavaş/dış işi dışarı al), savepoint (transaction içi checkpoint = kısmi geri alma). (2) EntityManager: DataSource=havuz / QueryRunner=handle (bağlantıyı tutan) / EntityManager=API; havuz tükenmesi (taksi filosu); manager'ı callback dışına kaçırma + await'siz bırakma tuzakları. (3) opsiyonel manager: resolver + runner, propagation (REQUIRED / REQUIRES_NEW=audit / NESTED=savepoint), manager'ı geçmeyi unutmak = sessiz ayrı transaction. (4) global vs DI: global "current manager" eşzamanlılıkta çöker (istekler birbirini ezer) + test düşmanı → AsyncLocalStorage (request-scope context; nestjs-cls / typeorm-transactional), DI ile sağla — global'in rahatlığı, bug'ı olmadan. (5) shim/köprü: kademeli geçiş (Strangler Fig), eskiyi kırmadan yeniye delege, geçici+ince+her an çalışır; opsiyonel `manager?`'ın kendisi bir shim.
 - İşlendi (2026-07-10): Derinleşme Rotası G4 (Desenler) — Port/Adapter (grup 1'in resmi adı: sözleşme + implementasyon), Repository Pattern (DB'yi bellekteki koleksiyon gibi göster; kütüphaneci benzetmesi), Leaky Abstraction (port ORM sızdırmasın; iş dili konuş — "ne" de, "nasıl" deme; mutfak-jargonu garson), Adapter Pattern (iki arayüz arası çeviri; seyahat priz adaptörü — bizim TypeOrm...Repository bunun örneği).
 - İşlendi (2026-07-10): Derinleşme Rotası G3 (OOP Mekaniği) — abstract class (gövdesiz sözleşme, new'lenemez, yarı dolu olabilir), implements (şekil sözü, miras yok) vs extends (gerçek davranış mirası), base class + kalıtım (ortak davranış tek yerde = DRY), generics `<T>` (aynı kod / farklı tip; T = "Type" için isim/convention, değer yerine tip alan parametre; any-vs-tekrar ikilemini çözer + tip güvenliği korunur), Rule of Three (3 kez tekrar etmeden soyutlama; yanlış soyutlama tekrardan pahalı; kasıtlı mimari dikişler/port muaf).
@@ -182,7 +183,7 @@ Teknik mülakatta veya ekipte "Bu özelliği nasıl tasarlamalıyız?" sorusuna 
 
 **Katman 5 — Derinleşme Rotası: Fat Service'ten Temiz, Test Edilebilir Mimariye**
 
-Durum: In Progress (G1-G5 işlendi 2026-07-10; sıradaki G6 — tek tek detaylı)
+Durum: In Progress (G1-G6 işlendi 2026-07-10; sıradaki G7 — son grup, sentez)
 Öncelik: P2
 Eklenme: 2026-07-07
 Son Güncelleme: 2026-07-10
@@ -231,7 +232,7 @@ Service'i SRP ile böl.
 - **Global singleton vs DI** — manager'ı global tutmak kolay ama global state test düşmanı (paylaşılan, izole edilemeyen durum). DI ile enjekte et.
 - **Shim / köprü deseni** — kademeli geçişte eskiyi kırmadan yeniyi ekleme; iki dünyayı geçici köprüyle bağlama.
 
-**6) Test** (mimarinin asıl ödülü) ← sıradaki (tek tek detaylı)
+**6) Test** (mimarinin asıl ödülü) ✓ işlendi (2026-07-10, tek tek detaylı)
 - **Test double / Mock / Stub / Spy** — sahte bağımlılık türleri; port sayesinde gerçeğin yerine sahtesini takarsın.
 - **Auto-mocking** — sağlanmayan bağımlılıkları otomatik sahteleme.
 - **Pozisyonel vs isimli/token bağımlılık** — pozisyona güvenen testler sıra değişince kırılır; token'a bağlananlar dayanıklı.
@@ -241,7 +242,7 @@ Service'i SRP ile böl.
 - **Fake green (yalancı yeşil)** — mock gerçeğin sözleşmesini korumazsa test yeşil ama üretim kırık.
 - **Deterministik eşzamanlılık testi** — `sleep` yerine promise barrier ile yarış (race) senaryosunu güvenilir tetikleme. (Isolation konusuna bağlanır.)
 
-**7) Fat Service** (varış noktası)
+**7) Fat Service** (varış noktası) ← sıradaki (son grup, sentez)
 - **Fat Service / God Object** — her şeyi yapan şişkin servisin parçalara ayrılması.
 - **Single Responsibility Principle** — her parçanın değişmek için tek bir nedeni olsun.
 
@@ -403,7 +404,7 @@ Notlar:
   Katman: Katman 5 (Derinleşme Rotası)
   Bugun Neye Baktim: Grup 1-3. Katmanlı mimari (Presentation/Domain/Infrastructure + Common kenarda; garson/aşçı/kiler/aletler benzetmesi), Dependency Rule (oklar içeri, domaine), Dependency Inversion (port'u domaine koy → ok tersine döner), Ports & Adapters/Hexagonal (çıkan şeklin adı). DI (new yerine constructor'dan enjekte), DI Container (otomatik montaj/depo görevlisi), DI Token (etiket), interface vs abstract class.
   Ne Anladim / Nerede Kaldim: Fat Service hastalık; tedavi = katmanla böl + oku içeri çevir. Domain KARAR verir ("email tekil mi", "bakiye yeter mi"), Infra İCRA eder (gerçek DB'ye gidiş + @Entity tablo tanımı). Ok içeri bakmalı ama domain DB'ye muhtaç → çelişkiyi port/adapter çözer: sözleşme (port) domainde, implementasyon (adapter) infrada, ok döner. Bu yüzden Ports & Adapters ayrı mimari değil, katmanlı mimarinin "oklar gerçekten içeri" hali. new = domaini somuta çakar → yerine DI: dışarıdan enjekte, kural korunur + test kolaylaşır. Container token'a bakıp otomatik takar. Port abstract class çünkü interface runtime'da yok olur, token olamaz (abstract class hem tip hem token). 3 akış katmanı + Common yan çekmece. G3 (OOP aletleri): abstract class = gövdesiz sözleşme; implements (şekil sözü) vs extends (davranış mirası); base class ortak kodu DRY tutar; generics `<T>` = değer yerine tip alan parametre (T sadece "Type" için isim), any/tekrar ikilemini çözerken tip güvenliğini korur; Rule of Three = 3 kez tekrar etmeden soyutlama, yanlış soyutlama tekrardan pahalı (kasıtlı dikişler/port muaf).
-  Sonraki Adim: Grup 6 — Test (tek tek detaylı): test double/mock/stub/spy, auto-mocking, pozisyonel vs token bağımlılık, test piramidi, unit/integration/e2e, testcontainers, fake green, deterministik eşzamanlılık testi.
+  Sonraki Adim: Grup 7 (son) — Fat Service / God Object + Single Responsibility Principle (rotanın sentezi).
   Durum: In Progress
 
 ---
