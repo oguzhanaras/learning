@@ -130,7 +130,7 @@ Veri yapılarını tanıdıktan sonra, üzerlerinde çalışan temel kalıplar.
 Durum: In Progress
 Öncelik: P2
 Son Güncelleme: 2026-07-10
-Bir Sonraki Odak: Ağ & İşletim Sistemi Temelleri — 1) TCP/IP & socket
+Bir Sonraki Odak: Ağ & OS Temelleri — B) İşletim Sistemi (process/thread, file descriptor, non-blocking I/O, buffer/stream) + A kalan HTTP sürümleri
 
 Hedef:
 - Backend sistem kararlarını bilinçli verebilmek (neden bu teknoloji, neden bu yaklaşım).
@@ -148,6 +148,7 @@ Notlar:
 - İşlendi (2026-06-29): Database index (B-Tree) — sıralı yardımcı yapı → binary search → O(log n); B-Tree disk I/O için sığ ağaç (3-4 gidiş); Prisma `@@index`; yazma maliyeti trade-off'u.
 - İşlendi (2026-07-07): Transactions & Consistency — ACID (ya hep ya hiç, commit/rollback); isolation seviyeleri (dirty / non-repeatable / phantom read → Read Uncommitted / Committed / Repeatable Read / Serializable + trade-off + `SELECT FOR UPDATE` cerrahi kilit); kod tarafı (izolasyon ayarını transaction açılışında ver; `EntityManager` = `BEGIN` açık tek bağlantıya kilitli "el"; opsiyonel manager parametresi deseni; global singleton yerine DI); strong vs eventual consistency ("2 sn eski yaralar mı?").
 - İşlendi (2026-07-10): Derinleşme Rotası G1+G2 — Katmanlı mimari (Presentation/Domain/Infrastructure + Common kenarda; garson/aşçı/kiler benzetmesi) + Dependency Rule (oklar içeri, domaine) + Dependency Inversion (port'u domaine koy → ok tersine döner) + Ports & Adapters/Hexagonal. DI (new değil, constructor'dan enjekte), DI Container (otomatik wiring / depo görevlisi), DI Token (etiket), interface vs abstract class (interface runtime'da buharlaşır → port = abstract class).
+- İşlendi (2026-07-10): Ağ & OS Temelleri — A/Ağ ana hattı (en tabandan tek tek). Ağ vs internet (ağların ağı; ortak IP kuralı). İnternet fiziksel: fiber/denizaltı kablo, ışık/voltaj = bit. Katman modeli (fiziksel→link→IP→transport→uygulama; iç içe zarflar). NIC = bit↔sinyal çevirici (giriş/çıkış kapısı). MAC = yerel teslimat kimliği (spoof edilebilir → sadece yerelde tekil olması yeterli). IP = 32-bit hiyerarşik adres (ağ+host, posta gibi → routing ölçeklenir); public vs private + NAT (tek public IP'yi portla paylaş; santral/dahili benzetmesi). Routing = hop hop; hedef IP sabit, MAC her adım değişir; BGP haritayı ara sıra öğrenir, iletme her pakette hızlı tablo araması; ABD→TR gerçekten kablo (ışık), mesafe = gecikme. Bağlanma: DHCP (IP+gateway+DNS). Modem (dışa/çevirici) vs router (içe/dağıtıcı). DNS = isim→IP hiyerarşik rehber (root→TLD→authoritative), cache+TTL → propagation = eventual consistency; domain tekilliği = ICANN→registry(Verisign)→registrar (tapu gibi, kiralarsın); splinternet (kendi ağını kurabilirsin ama dünyayla kopuk; internet = anlaşma, izin değil). TCP handshake (SYN/SYN-ACK/ACK). TLS = TCP üstünde gizlilik + kimlik (public/private key ile ortak simetrik anahtar; sertifika/CA güven zinciri, pasaport). Tam yolculuk (DNS→TCP→TLS→HTTP→render); HTML iskelet + CSS/JS ayrı istekler; JS tarayıcıda çalışır (event loop), fetch → API → JSON. Kısaltmalar: TCP=Transmission Control Protocol, TLS=Transport Layer Security, IP=Internet Protocol.
 - İşlendi (2026-07-10): Derinleşme Rotası G7 (Fat Service + SRP) — God Object = her şeyi yapan dev sınıf (çok değişme nedeni, test edilemez, kırılgan). SRP = "tek değişme nedeni / tek aktör" (İsviçre çakısı vs alet çantası; tek kişilik restoran). Bölme = rotanın SENTEZİ: katman (G1) + port/DI (G1-2) + OOP (G3) + desen (G4) + transaction sınırı use-case'te (G5) + izole test (G6) hep bu bölmenin aleti. Aşırı bölme de hata → cohesion (birlikte değişen birlikte dursun); Rule of Three + shim/Strangler ile güvenli, kademeli çıkarma. → ROTA TAMAMLANDI (G1-G7).
 - İşlendi (2026-07-10): Derinleşme Rotası G6 (Test, tek tek detaylı) — test double taksonomisi (dummy=yer doldur / stub=hazır cevap besle→ÇIKTIYA bak / spy=cevap+kayıt / mock=etkileşimi doğrula→ÇAĞRIYA bak / fake=hafif gerçek in-memory); port+DI test double'ı mümkün kılar. auto-mocking (vermediğini otomatik sahtele, sen sadece önemliyi ayarla). pozisyonel vs token bağımlılık (sıraya güvenen test refactor'da sessizce kırılır → token'a/isme göre çöz, "3. ev" değil "adres"). test piramidi (çok unit / az integration / az e2e; ters = dondurma külahı) + unit/integration/e2e (ne kadarı gerçek). testcontainers (gerçek + tek kullanımlık + izole DB container; ortak DB = kirli, SQLite = yalan). fake green (mock gerçeğin sözleşmesini korumazsa test yeşil / üretim kırık → integration + contract test ile dürüst tut). deterministik eşzamanlılık testi (sleep = flaky/yavaş/garantisiz → promise barrier ile iç içe geçmeyi kurgula; isolation'a geri bağlanır, çember kapanır).
 - İşlendi (2026-07-10): Derinleşme Rotası G5 (Transaction, tek tek detaylı) — (1) pratik: lifecycle (BEGIN→iş→COMMIT/ROLLBACK→release), transaction sınırı use-case seviyesinde açılır (repo'da değil; "bir iş = bir fiş"), kısa tut (bağlantı + kilit tutar; yavaş/dış işi dışarı al), savepoint (transaction içi checkpoint = kısmi geri alma). (2) EntityManager: DataSource=havuz / QueryRunner=handle (bağlantıyı tutan) / EntityManager=API; havuz tükenmesi (taksi filosu); manager'ı callback dışına kaçırma + await'siz bırakma tuzakları. (3) opsiyonel manager: resolver + runner, propagation (REQUIRED / REQUIRES_NEW=audit / NESTED=savepoint), manager'ı geçmeyi unutmak = sessiz ayrı transaction. (4) global vs DI: global "current manager" eşzamanlılıkta çöker (istekler birbirini ezer) + test düşmanı → AsyncLocalStorage (request-scope context; nestjs-cls / typeorm-transactional), DI ile sağla — global'in rahatlığı, bug'ı olmadan. (5) shim/köprü: kademeli geçiş (Strangler Fig), eskiyi kırmadan yeniye delege, geçici+ince+her an çalışır; opsiyonel `manager?`'ın kendisi bir shim.
@@ -253,7 +254,7 @@ Service'i SRP ile böl.
 
 **Katman 5 — Ağ & İşletim Sistemi Temelleri (Donanıma Yakın Sistem Düşüncesi)**
 
-Durum: In Progress (Derinleşme Rotası bitti; buradan devam 2026-07-10)
+Durum: In Progress (A/Ağ ana hattı işlendi 2026-07-10; sıradaki: A kalan HTTP sürümleri + B/İşletim Sistemi)
 Öncelik: P2
 Eklenme: 2026-07-10
 
@@ -264,11 +265,11 @@ gelir, kabaca nasıl çalışır, neden önemli" seviyesi (Çalışma Tarzı Not
 zaten öğrendiğin bir şeye bağlanıyor.
 
 **A) Ağ Temelleri**
-- **TCP/IP & socket** — socket nedir, port, 3-way handshake; bağlantı kurmak neden "pahalı". → bağlantı havuzu konusunun temeli (bugün konuşuldu).
-- **TLS / HTTPS** — şifreli bağlantı, TLS handshake (ekstra gidiş-geliş = gecikme), sertifika/CA. → ortamdaki proxy + CA bundle buraya oturur.
-- **HTTP/1.1 → HTTP/2 → HTTP/3** — keep-alive (bağlantı tekrar kullanımı = havuz fikri), multiplexing, head-of-line blocking.
-- **DNS** — isim → IP çözümü, caching, propagation gecikmesi. → eventual consistency'nin canlı örneği.
-- **Bir isteğin tam yolculuğu** — URL yazınca ne oluyor: DNS → TCP → TLS → HTTP → cevap. Hepsini bağlayan tur.
+- **TCP/IP & socket** ✓ — socket nedir, port, 3-way handshake; bağlantı kurmak neden "pahalı". → bağlantı havuzu konusunun temeli (bugün konuşuldu).
+- **TLS / HTTPS** ✓ — şifreli bağlantı, TLS handshake (ekstra gidiş-geliş = gecikme), sertifika/CA. → ortamdaki proxy + CA bundle buraya oturur.
+- **HTTP/1.1 → HTTP/2 → HTTP/3** (kısmen) — keep-alive (bağlantı tekrar kullanımı = havuz fikri), multiplexing, head-of-line blocking.
+- **DNS** ✓ — isim → IP çözümü, caching, propagation gecikmesi. → eventual consistency'nin canlı örneği. (+ domain tekilliği: ICANN→registry→registrar; splinternet)
+- **Bir isteğin tam yolculuğu** ✓ — URL yazınca ne oluyor: DNS → TCP → TLS → HTTP → cevap. Hepsini bağlayan tur. (+ HTML iskelet + CSS/JS ayrı istekler; JS tarayıcıda çalışır; API → JSON)
 
 **B) İşletim Sistemi / Süreç Temelleri**
 - **Process vs Thread** — (rotadaki Concurrency başlığıyla birleşir) bellek paylaşımı, izolasyon.
@@ -407,6 +408,13 @@ Notlar:
   Ne Anladim / Nerede Kaldim: Fat Service hastalık; tedavi = katmanla böl + oku içeri çevir. Domain KARAR verir ("email tekil mi", "bakiye yeter mi"), Infra İCRA eder (gerçek DB'ye gidiş + @Entity tablo tanımı). Ok içeri bakmalı ama domain DB'ye muhtaç → çelişkiyi port/adapter çözer: sözleşme (port) domainde, implementasyon (adapter) infrada, ok döner. Bu yüzden Ports & Adapters ayrı mimari değil, katmanlı mimarinin "oklar gerçekten içeri" hali. new = domaini somuta çakar → yerine DI: dışarıdan enjekte, kural korunur + test kolaylaşır. Container token'a bakıp otomatik takar. Port abstract class çünkü interface runtime'da yok olur, token olamaz (abstract class hem tip hem token). 3 akış katmanı + Common yan çekmece. G3 (OOP aletleri): abstract class = gövdesiz sözleşme; implements (şekil sözü) vs extends (davranış mirası); base class ortak kodu DRY tutar; generics `<T>` = değer yerine tip alan parametre (T sadece "Type" için isim), any/tekrar ikilemini çözerken tip güvenliğini korur; Rule of Three = 3 kez tekrar etmeden soyutlama, yanlış soyutlama tekrardan pahalı (kasıtlı dikişler/port muaf).
   Sonraki Adim: Ağ & İşletim Sistemi Temelleri kümesi — 1) TCP/IP & socket (bağlantı neden pahalı).
   Durum: Done (tüm Derinleşme Rotası G1-G7 tamamlandı)
+
+- Tarih: 2026-07-10
+  Katman: Katman 5 (Ağ & İşletim Sistemi Temelleri)
+  Bugun Neye Baktim: Ağ kümesi A grubu (Ağ Temelleri) en tabandan tek tek. Fiziksel (kablo/sinyal=bit) → NIC (bit↔sinyal çevirici) → MAC (yerel teslimat) → IP (hiyerarşik adres; public/private; NAT) → routing (hop hop; BGP) → DHCP / modem vs router → DNS (isim→IP; cache/propagation; domain tekilliği/registry; splinternet) → TCP handshake → TLS (şifreleme + sertifika/CA) → bir isteğin tam yolculuğu (HTML + CSS/JS ayrı istek; JS tarayıcıda çalışır; API→JSON).
+  Ne Anladim / Nerede Kaldim: İnternet = ağların ağı; fiziksel omurga fiber/denizaltı kablo (ışık=bit). Katmanlı model: her katman üstekini zarfa koyar. IP = değişmeyen nihai adres, MAC = her hop değişen sonraki durak. NAT tek public IP'yi portla paylaşır. İnternet izin değil ORTAK ANLAŞMA: kendi ağını kurabilirsin ama dünyayla iletişim için ortak hiyerarşiye (domain registry + IP tahsis + BGP) girmelisin. DNS propagation = eventual consistency; domain sahiplik = strong (tek registry). TLS: public/private key ile açık hattan ortak simetrik anahtarda anlaş + sertifika/CA ile kimlik (güven zinciri = pasaport). Köprüler: havuz↔TCP handshake maliyeti, event loop↔JS click handler, serialization↔API JSON.
+  Sonraki Adim: A kalan (HTTP/1.1→2→3 detay) + B grubu (İşletim Sistemi: process vs thread, file descriptor, blocking vs non-blocking I/O + epoll/libuv, buffer/stream).
+  Durum: In Progress (A/Ağ ana hattı işlendi; B/İşletim Sistemi kaldı)
 
 ---
 
