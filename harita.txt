@@ -129,7 +129,7 @@ Veri yapılarını tanıdıktan sonra, üzerlerinde çalışan temel kalıplar.
 
 Durum: In Progress
 Öncelik: P2
-Son Güncelleme: 2026-06-29
+Son Güncelleme: 2026-08-06
 Bir Sonraki Odak: Transactions & Consistency
 
 Hedef:
@@ -146,6 +146,7 @@ Notlar:
 - İşlendi (2026-06-01): Call stack & event loop — stack vs task kuyruk; timer (libuv/host) → kuyruk → loop → stack; V8 vs Node ayrımı.
 - İşlendi (2026-06-17): Serialization — JSON vs Protobuf, neden gerekli, CPU/boyut/versiyonlama maliyetleri.
 - İşlendi (2026-06-29): Database index (B-Tree) — sıralı yardımcı yapı → binary search → O(log n); B-Tree disk I/O için sığ ağaç (3-4 gidiş); Prisma `@@index`; yazma maliyeti trade-off'u.
+- Sıraya alındı (2026-08-06): 3 yeni konu; detay materyali `calisma.txt` dosyasında (Konu 1/2/3).
 
 Bu katman, öğrendiğin her şeyi gerçek backend sistem tasarımına bağlar. Burada "nasıl kod yazarım"dan çok "neden böyle yapıyoruz" sorusu ağır basar.
 
@@ -153,11 +154,14 @@ Bu katman, öğrendiğin her şeyi gerçek backend sistem tasarımına bağlar. 
 - **Database index** — B-Tree yapısı. Katman 3'teki tree bilgisi + Katman 1'deki disk I/O anlayışı birleşir. Prisma'da `@@index` koyduğunda altta ne oluyor.
 - **Transactions & Consistency** — ACID, isolation seviyeleri (Read Committed, Repeatable Read, Serializable). Distributed transaction sorunları. Ne zaman strong consistency şart, ne zaman eventual consistency yeter?
 - **Caching Stratejileri** — Redis, local cache. Cache-aside, write-through, write-behind. Invalidation, stampede, thundering herd. Ne zaman cache, ne zaman doğrudan DB?
+- **Şablon + Override vs Materialization** — kalıtımlı veri modelleme (şirket ayarı → şube override). Sparse override mı, her şubeye tam kopya mı? Asıl soru "üst değer canlı mı, yoksa oluşturma anındaki snapshot mı". Duplication'ın maliyeti yer değil tutarlılık; kopya varsa türetilmiş olsun. Detay: `calisma.txt` Konu 3.
 
 **Mimari & Tasarım Prensipleri**
 - **OOP & Composition** — Inheritance vs Composition. Backend'de ne zaman class kullanmalı, ne zaman sade fonksiyon + veri? Encapsulation'ın pratikteki değeri.
+- **Prototip zinciri & serialization sınırı** — getter prototipte yaşar, own property değildir; `JSON.stringify` prototipe bakmaz. "Serviste çalışıyor ama API yanıtında `undefined`" hatasının kökü. DB satırı / entity nesnesi / prototip üç ayrı katman. Detay: `calisma.txt` Konu 1.
 - **SOLID Prensipleri** — Single Responsibility, Open/Closed, Liskov, Interface Segregation, Dependency Inversion. Özellikle Dependency Inversion ve Inversion of Control'ün backend'deki karşılığı (DI container, test edilebilirlik).
 - **Clean Code & Layering** — Anlamlı isimlendirme, fonksiyon boyutu, sorumluluk ayrımı. Clean Architecture / Hexagonal Architecture / Layered Architecture. Kodun test edilebilir ve uzun vadede değiştirilebilir olması.
+- **Port & Adapter (pratik)** — gerçek projede katmanlar (api / domain / infra / common), port = domain'in sözleşmesi (abstract class), adapter = teknolojiyle dolduran sınıf (TypeORM, ödeme sağlayıcı). DI ile bağlama, provider registry, bağımlılık yönünün sözleşmeye dönmesi. Detay: `calisma.txt` Konu 2.
 - **API Design** — REST, GraphQL, gRPC arasındaki gerçek trade-off'lar. İyi endpoint tasarımı, versioning, pagination, filtering, error response formatı. Ne zaman hangisi mantıklı?
 
 **İletişim, Ölçek & Dayanıklılık**
@@ -284,6 +288,13 @@ Notlar:
   Sonraki Adım: Transactions & Consistency (ACID, isolation seviyeleri).
   Durum: Done
 
+- Tarih: 2026-08-06
+  Katman: Katman 5 (+ Katman 2 bağlantısı)
+  Bugun Neye Baktim: Gerçek projeden çıkan 3 konu haritaya alındı, detay materyali `calisma.txt`e yazıldı. (1) Prototip zinciri & JSON.stringify sınırı — getter prototipte, own property değil. (2) Katmanlı mimari + port/adapter (api/domain/infra/common, abstract repo + TypeORM adapter, IPaymentProvider + registry). (3) Şablon + override vs materialization — şirket ayarı → şube override kararı.
+  Ne Anladim / Nerede Kaldim: Henüz çalışılmadı, sadece materyal hazırlandı. Üçünün ortak teması: bir değerin NEREDE durduğu (own property mi prototipte mi / domain'de mi infra'da mı / şirkette mi şubede mi) davranıştan daha belirleyici. Konu 3'te asıl sorunun teknik değil ürün sorusu olduğu not edildi: üst değer canlı mı, snapshot mı.
+  Sonraki Adım: Önce Transactions & Consistency'yi bitir, sonra sırayla Konu 1 → 2 → 3.
+  Durum: Not Started
+
 ---
 
 **Calisma Tarzi Notu (2026-05-17)**
@@ -340,6 +351,18 @@ Backlog (örnek):
 - [ ] Konu: Circuit Breaker, Retry, Idempotency pattern'leri
   Katman: Katman 5
   Kisa Not: Dağıtık sistemlerde dayanıklılık.
+
+- [ ] Konu: Prototip zinciri & JSON.stringify sınırı
+  Katman: Katman 2 + Katman 5
+  Kisa Not: Getter prototipte, own property değil → API'de undefined. Detay: calisma.txt Konu 1.
+
+- [ ] Konu: Katmanlı mimari & Port/Adapter (bus_backend örneği)
+  Katman: Katman 5
+  Kisa Not: api/domain/infra/common; abstract repo + TypeORM adapter; DI ile bağlama. Detay: calisma.txt Konu 2.
+
+- [ ] Konu: Şablon + Override vs Materialization (ayar kalıtımı)
+  Katman: Katman 5
+  Kisa Not: Şirket ayarı → şube override; sparse mı tam kopya mı, drift ve resolver. Detay: calisma.txt Konu 3.
 
 ---
 
