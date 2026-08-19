@@ -129,8 +129,8 @@ Veri yapılarını tanıdıktan sonra, üzerlerinde çalışan temel kalıplar.
 
 Durum: In Progress
 Öncelik: P2
-Son Güncelleme: 2026-06-29
-Bir Sonraki Odak: Transactions & Consistency
+Son Güncelleme: 2026-08-19
+Bir Sonraki Odak: Concurrency Adım 4 — Scheduler & context switch (sonra: GC, ardından Transactions & Consistency)
 
 Hedef:
 - Backend sistem kararlarını bilinçli verebilmek (neden bu teknoloji, neden bu yaklaşım).
@@ -146,6 +146,7 @@ Notlar:
 - İşlendi (2026-06-01): Call stack & event loop — stack vs task kuyruk; timer (libuv/host) → kuyruk → loop → stack; V8 vs Node ayrımı.
 - İşlendi (2026-06-17): Serialization — JSON vs Protobuf, neden gerekli, CPU/boyut/versiyonlama maliyetleri.
 - İşlendi (2026-06-29): Database index (B-Tree) — sıralı yardımcı yapı → binary search → O(log n); B-Tree disk I/O için sığ ağaç (3-4 gidiş); Prisma `@@index`; yazma maliyeti trade-off'u.
+- İşlendi (2026-08-19): Concurrency temelleri, Adım 1-3 — çekirdek & "aynı anda" (paralellik vs eşzamanlılık); register + JIT (V8 bytecode → sıcaksa makine kodu); process & sanal bellek (sayfa tablosu, MMU, PID = kimlik ≠ adres); process durumları (R/S); thread (özel register+stack, paylaşılan heap & sayfa tablosu). Node'un gerçek thread dağılımı, race condition ve GC duraklaması ölçüldü.
 
 Bu katman, öğrendiğin her şeyi gerçek backend sistem tasarımına bağlar. Burada "nasıl kod yazarım"dan çok "neden böyle yapıyoruz" sorusu ağır basar.
 
@@ -161,7 +162,8 @@ Bu katman, öğrendiğin her şeyi gerçek backend sistem tasarımına bağlar. 
 - **API Design** — REST, GraphQL, gRPC arasındaki gerçek trade-off'lar. İyi endpoint tasarımı, versioning, pagination, filtering, error response formatı. Ne zaman hangisi mantıklı?
 
 **İletişim, Ölçek & Dayanıklılık**
-- **Concurrency temelleri** — thread, process, async I/O farkı. NestJS'te neden her şey async, Node'un single-thread + event loop modeli neden bu kadar etkili.
+- **Concurrency temelleri** — thread, process, async I/O farkı. NestJS'te neden her şey async, Node'un single-thread + event loop modeli neden bu kadar etkili. Çok çekirdekli sunucuda ölçekleme: Node thread ile değil **process** ile çoğalır (cluster / PM2 / K8s replica) ve bunun bedeli "shared nothing" (cron 8 kez çalışır, in-memory cache tutarsızlaşır, throttler yanlış sayar).
+- **Garbage Collection (V8)** — heap neden otomatik temizleniyor, generational GC (young/old nesil), minor (scavenge) vs major (tam) toplama, stop-the-world duraklaması. Kritik nokta: JS tek thread'de koştuğu için GC duraklaması = **tüm isteklerin durması**. Bol tahsis (log payload üretimi, büyük bekleyen kuyruk) → p99 latency sıçraması. `--max-old-space-size`, heap ölçümü, `perf_hooks` GC gözlemi.
 - **Messaging & Event-Driven** — Queue'lar (RabbitMQ, Bull, Kafka), pub/sub. Servisler arası decoupling, eventual consistency, background job'lar. Ne zaman sync çağrı, ne zaman event?
 - **Resilience Patterns** — Retry, Circuit Breaker, Timeout, Bulkhead, Graceful Degradation. "Bu servis down olursa sistem ne yapar?"
 - **Rate Limiting & Backpressure** — API'leri korumak, kaynakları yönetmek.
@@ -284,6 +286,13 @@ Notlar:
   Sonraki Adım: Transactions & Consistency (ACID, isolation seviyeleri).
   Durum: Done
 
+- Tarih: 2026-08-19
+  Katman: Katman 5
+  Bugun Neye Baktim: Concurrency temelleri, adım adım (Adım 1-3). (1) Çekirdek: bir çekirdek her an tek komut akışı yürütür; paralellik (gerçekten aynı anda, N çekirdek) vs eşzamanlılık (tek çekirdek, hızlı geçiş). (2) Register: CPU içindeki ~16 hücre, aritmetik sadece burada yapılabilir; bir thread'in "context"i = register seti. Buildtime vs runtime: C = AOT, JS = JIT (V8: kaynak → bytecode → sıcaksa makine kodu); `nest build` makine kodu değil, TS→JS üretiyor (ısınma/warm-up bundan). (3) Process: OS'in çizdiği sınır — kendi adres alanı + fd tablosu + PID. İzolasyon belleği bölerek değil, her process'e ayrı **sayfa tablosu** vererek; MMU her erişimde sanal→fiziksel çeviriyor, aynı sanal adres iki process'te farklı fiziksel yere gidiyor. Bellek bitişik değil, dağınık 4KB sayfalar; tablo düz gösteriyor. PID = kimlik numarası, adres değil. Process durumları: 75 process'in sadece 1'i R, gerisi S → var olmak ≠ çekirdek kullanmak. (4) Thread: process kutu, çalışan şey thread. Thread'e özel = register + stack; paylaşılan = heap, kod, fd, **sayfa tablosu**. Docker = VM değil, process + namespace + cgroup.
+  Ne Anladim / Nerede Kaldim: 8 çekirdeği doldurmak = çalışmaya hazır 8 thread demek; scheduler process/thread ayrımı yapmıyor (Linux'ta ikisi de task, fark clone() bayrakları). Node aslında çok thread'li ama **JS'imi çalıştıran tek thread**: ölçtüm, 7 thread (1 ana + DelayedTaskSche + 5 V8 işçisi), `crypto` çağırınca libuv havuzu tembel doğup 11'e çıktı (8 iş, 4 thread → sıraya girdi). Diğer thread'ler "OS iletişimi" değil: V8'inkiler motorun iç işleri (GC, JIT), libuv havuzu ise OS'te non-blocking karşılığı olmayan işler (fs, crypto, zlib, dns.lookup). Ağ I/O hiçbir thread kullanmıyor (epoll) — Adım 5'in konusu. Race condition ölçtüm: 4 thread × 200k artırma, beklenen 800000 → 796429 ve 774029 çıktı (her çalıştırmada farklı, bu yüzden reproduce edilemiyor); sebebi Adım 1'deki LOAD/ADD/STORE üçlüsünün araya girilebilmesi; `Atomics.add` (donanım atomik komutu) ile tam 800000. Bunu JS'te yapabilmek için worker_threads + SharedArrayBuffer gerekti — normal NestJS kodunda mümkün değil, tek thread olmanın hediyesi bu. GC duraklaması ölçtüm: tahsissiz CPU işinde event loop p99 4.4ms, bol tahsiste 218ms; 126 minor GC toplam 2990ms (en uzun tek duruş 78ms), ana thread GC yüzünden toplam 3021ms durmuş. Sonuç: log payload'ı üretmenin/kuyrukta tutmanın maliyeti sadece stringify değil, GC baskısı — kuyruğu sınırlı tutma sebebi bu.
+  Sonraki Adım: Adım 4 — Scheduler & context switch (75 process 8 çekirdeğe nasıl sığıyor, context switch neden pahalı, TLB soğuması). Sonra Adım 5 (bloklayan vs bloklamayan I/O), ardından GC ayrı başlık.
+  Durum: In Progress
+
 ---
 
 **Calisma Tarzi Notu (2026-05-17)**
@@ -340,6 +349,18 @@ Backlog (örnek):
 - [ ] Konu: Circuit Breaker, Retry, Idempotency pattern'leri
   Katman: Katman 5
   Kisa Not: Dağıtık sistemlerde dayanıklılık.
+
+- [ ] Konu: Garbage Collection (V8) — generational GC, minor/major, stop-the-world
+  Katman: Katman 5
+  Kisa Not: Ölçüldü — bol tahsiste event loop p99 4.4ms → 218ms. Tek thread'de GC duruşu = tüm isteklerin durması.
+
+- [ ] Konu: Node'u çok çekirdeğe yayma — cluster / PM2 / K8s replica
+  Katman: Katman 5
+  Kisa Not: Shared-nothing bedeli: cron N kez çalışır, in-memory cache tutarsız, throttler yanlış sayar.
+
+- [ ] Konu: libuv thread pool (UV_THREADPOOL_SIZE) ve hangi işler havuzu kullanır
+  Katman: Katman 5
+  Kisa Not: fs/crypto/zlib/dns.lookup havuzu yer; ağ I/O yemez. Varsayılan 4, tembel doğuyor.
 
 ---
 
