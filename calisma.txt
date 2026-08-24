@@ -1,0 +1,457 @@
+ÇALIŞMA NOTLARI — DETAY
+
+Amaç: `harita.txt` yol haritasıdır, kısa tutulur. Bu dosya ise tek tek konuların
+uzun/detaylı işlenmiş hâlini tutar. Haritadaki bir başlık burada açılır.
+
+════════════════════════════════════════════════════════════════════════════════
+
+KONU 1 — Prototip Zinciri ve JSON.stringify Sınırı
+Katman: Katman 2 (bellek/referans) + Katman 5 (serialization)
+Durum: Not Started (materyal hazır, çalışılacak)
+
+Problem cümlesi:
+  `trip.status` serviste gayet güzel çalışıyor, ama HTTP yanıtında
+  `status: undefined` dönüyor. Neden?
+
+────────────────────────────────────────────────────────────────────────────────
+1. Donanım / bellek: RAM'de ne var
+
+Diyelim 1000 sefer yükledin. RAM'de şu oluşuyor:
+
+   ┌─ nesne a ────────┐   ┌─ nesne b ────────┐   ┌─ nesne c ────────┐
+   │ id: 'trip-1'     │   │ id: 'trip-2'     │   │ id: 'trip-3'     │
+   │ isActive: true   │   │ isActive: true   │   │ isActive: false  │
+   │ hasSettlement: T │   │ hasSettlement: F │   │ hasSettlement: F │
+   │ __proto__: ●─────┼───┼─ __proto__: ●────┼───┼─ __proto__: ●    │
+   └──────────────────┘   └──────────────────┘   └────────┬─────────┘
+                                                          │
+                        hepsi AYNI adresi gösteriyor      │
+                                                          ▼
+                                        ┌─ Trip.prototype ──────────┐
+                                        │ constructor: fn           │
+                                        │ status: [getter fonksiyon]│  ← TEK KOPYA
+                                        └───────────────────────────┘
+
+- 1000 nesne → 1000 ayrı bellek bloğu. Her birinde `id`, `isActive`,
+  `hasSettlement` değerleri gerçekten ayrı ayrı duruyor.
+- Prototip → 1 tane. Her nesne onun adresini (pointer, 8 byte) taşıyor,
+  içeriğini değil.
+
+Bu bilinçli bir optimizasyon: `status` hesaplayan fonksiyonun makine kodunu
+1000 kez kopyalamanın anlamı yok — davranış hepsinde aynı. Değişen tek şey
+`this`'in hangi nesneyi gösterdiği.
+
+  Object.getPrototypeOf(a) === Object.getPrototypeOf(b)  // true → aynı adres
+
+────────────────────────────────────────────────────────────────────────────────
+2. Yazılım: okuma nasıl çalışıyor
+
+`trip.status` yazdığında JavaScript şunu yapar:
+
+  1. Nesnenin KENDİSİNE bak       → 'status' var mı?  yok
+  2. Prototipine (Trip.prototype) → 'status' var mı?  VAR, getter → çalıştır
+  3. Değeri döndür                → 'departed'
+
+Buna prototip zinciri deniyor. Bu yüzden `trip.status` gayet güzel çalışıyor —
+hata orada değil.
+
+────────────────────────────────────────────────────────────────────────────────
+3. JSON.stringify neden zinciri yürümüyor
+
+Çünkü JSON'un işi veri taşımak, davranış taşımak değil. Kuralı tek cümle:
+
+  Sadece nesnenin kendi (own) özelliklerini serialize et. Prototipe hiç bakma.
+
+Mantığı şu: prototip 1000 nesnenin ortak parçası. Onu serialize etseydi, aynı
+fonksiyon tanımını 1000 kez ağa göndermiş olurdun. Zaten fonksiyonlar JSON'da
+temsil bile edilemez.
+
+Yani `JSON.stringify` bir hata yapmıyor — tam olarak tasarlandığı gibi
+çalışıyor. Sorun, bizim `status`'ü "veri" olarak yollamak isteyip "davranış"
+olarak tanımlamamız.
+
+────────────────────────────────────────────────────────────────────────────────
+4. Gerçek zinciri iki şıkla simüle et
+
+İki şık serviste birebir aynı ('departed'), API sınırında biri undefined:
+
+  class Trip {
+    id;
+    isActive;
+    hasSettlement;
+
+    // ŞIK A — getter: prototipte yaşar, own property DEĞİL
+    get status() {
+      if (!this.isActive) return 'cancelled';
+      return this.hasSettlement ? 'settled' : 'departed';
+    }
+  }
+
+  const a = new Trip();
+  Object.assign(a, { id: 'trip-1', isActive: true, hasSettlement: false });
+
+  a.status                                   // 'departed'      ✅ serviste çalışır
+  Object.keys(a)                             // ['id','isActive','hasSettlement']
+  'status' in a                              // true  (zincir yürür)
+  a.hasOwnProperty('status')                 // false (kendi özelliği değil)
+  JSON.stringify(a)                          // status YOK      ❌ API'de kaybolur
+
+  // ŞIK B — hesaplanıp nesnenin KENDİSİNE yazılan alan
+  const b = new Trip();
+  Object.assign(b, { id: 'trip-1', isActive: true, hasSettlement: false });
+  b.status = b.isActive ? (b.hasSettlement ? 'settled' : 'departed') : 'cancelled';
+
+  b.status                                   // 'departed'      ✅
+  b.hasOwnProperty('status')                 // true
+  JSON.stringify(b)                          // status VAR      ✅
+
+Fark davranışta değil, özelliğin NEREDE durduğunda.
+
+────────────────────────────────────────────────────────────────────────────────
+5. DB kaydı ile prototip: ne farkı var
+
+Üç ayrı katman var, karıştırılan yer tam burası:
+
+┌────────────────┬──────────────────────────┬────────────────────────────┬──────────────────────────────┐
+│                │ Nerede durur             │ Ne kadar yaşar             │ Kim yazar                    │
+├────────────────┼──────────────────────────┼────────────────────────────┼──────────────────────────────┤
+│ DB satırı      │ Diskte, postgres         │ Kalıcı — sunucu kapansa da │ INSERT / UPDATE              │
+│                │ dosyalarında             │ durur                      │                              │
+├────────────────┼──────────────────────────┼────────────────────────────┼──────────────────────────────┤
+│ Entity nesnesi │ RAM'de, o isteğe ait     │ Milisaniyeler — istek      │ TypeORM, satırı okuyup       │
+│                │ bellek bloğu             │ bitince GC siler           │                              │
+├────────────────┼──────────────────────────┼────────────────────────────┼──────────────────────────────┤
+│ Prototip       │ RAM'de, uygulama         │ Uygulama kapanana kadar    │ JS motoru, class tanımını    │
+│                │ açılırken 1 kez kurulur  │                            │ okuyunca                     │
+└────────────────┴──────────────────────────┴────────────────────────────┴──────────────────────────────┘
+
+DB'nin prototipten haberi bile yok. Prototip veritabanına ait bir şey değil —
+JavaScript'in çalışma zamanına ait. `class Trip { ... }` satırını motor okuduğu
+anda, daha hiçbir sefer yüklenmemişken oluşuyor.
+
+Sıra şöyle işliyor:
+
+  1. Uygulama açılır      → Trip.prototype kurulur (1 kez, getter'lar buraya)
+  2. İstek gelir          → SELECT * FROM trips WHERE id = ...
+  3. Postgres satır döner → { id: 'trip-1', is_active: true, has_settlement: true }
+  4. TypeORM entity yapar → new Trip()  +  kolonları NESNENİN KENDİSİNE yazar
+  5. Servis çalışır       → trip.status  (prototip zinciri yürür, çalışır ✅)
+  6. transformResponse    → JSON.stringify (prototipe BAKMAZ ❌)
+  7. HTTP yanıtı          → status: undefined
+
+`@Column` dekoratörü tam olarak şunu söylüyor: "bu kendi özellik, DB'deki şu
+kolona karşılık gelir." Adım 4'te TypeORM'un neyi yazacağını o belirliyor.
+Getter'ın `@Column`'u yok, dolayısıyla adım 4'te yazılmaz — hiçbir zaman kendi
+özellik olmaz.
+
+────────────────────────────────────────────────────────────────────────────────
+6. Çıkarım / refleks
+
+- "Serviste var ama JSON'da yok" → önce sor: bu kendi özellik mi, prototipte mi?
+- Ağdan geçecek her şey own property olmalı. Davranış prototipte kalabilir,
+  veri kalamaz.
+- Çözüm yönleri: response DTO'ya açıkça map et / `toJSON()` yaz / serialize
+  sırasında hesaplanan alanı ekle (`@Expose` + class-transformer gibi).
+- Katman 5'teki serialization notuyla aynı kök: bellekteki nesne ≠ ağdaki veri.
+
+════════════════════════════════════════════════════════════════════════════════
+
+KONU 2 — Katmanlı Mimari ve Port/Adapter Mantığı (bus_backend)
+Katman: Katman 5 (Clean Code & Layering + Dependency Inversion)
+Durum: Not Started (materyal hazır, çalışılacak)
+
+Ana yapı: NestJS + katmanlı mimari + port/adapter (hexagonal'a yakın).
+
+Akış:
+  HTTP isteği → api → domain → (port) → infra adapter → dış dünya (DB, BibsPay, SMS…)
+
+────────────────────────────────────────────────────────────────────────────────
+1. Katmanlar
+
+┌────────┬─────────────┬────────────────────────────────────────────────────────────┐
+│ Katman │ Klasör      │ Görevi                                                     │
+├────────┼─────────────┼────────────────────────────────────────────────────────────┤
+│ API    │ src/api/    │ HTTP, guard, DTO. İş kuralı yok; domain servisini çağırır. │
+├────────┼─────────────┼────────────────────────────────────────────────────────────┤
+│ Domain │ src/domain/ │ Asıl iş mantığı (bilet, sefer, finans…).                   │
+├────────┼─────────────┼────────────────────────────────────────────────────────────┤
+│ Infra  │ src/infra/  │ DB, ödeme, event outbox, cache, e-bilet, SMS…              │
+├────────┼─────────────┼────────────────────────────────────────────────────────────┤
+│ Common │ src/common/ │ Pagination, hata, interceptor gibi paylaşılan araçlar.     │
+└────────┴─────────────┴────────────────────────────────────────────────────────────┘
+
+Path alias'lar da bunu yansıtır: `@api/*`, `@domain/*`, `@infra/*`, `@common/*`.
+
+API tarafında 4 consumer aynı domain'i farklı kapılardan kullanır:
+
+  • system   — global admin
+  • panel    — şirket personeli + RBAC
+  • partner  — entegrasyon
+  • customer — son kullanıcı
+
+Yani iş mantığı tek yerde; sadece erişim ve DTO değişir.
+
+────────────────────────────────────────────────────────────────────────────────
+2. Adapter / port mantığı
+
+Klasik Port & Adapter:
+
+  • Port    = domain'in ihtiyaç duyduğu sözleşme (abstract class veya interface)
+  • Adapter = o sözleşmeyi gerçek teknolojiyle dolduran sınıf (TypeORM, BibsPay…)
+
+A) Persistence (DB)
+
+  Port domain'de:
+
+    // domain/.../repositories/booking.repository.ts
+    export abstract class BookingRepository {
+      abstract findByPnr(...): Promise<Booking | null>;
+      // ...
+    }
+
+  Adapter infra'da:
+
+    // infra/persistence/typeorm/repositories/typeorm-booking.repository.ts
+    export class TypeOrmBookingRepository
+      extends BaseTypeOrmRepository<Booking>
+      implements BookingRepository { ... }
+
+  DI bağlama modülde:
+
+    { provide: BookingRepository, useClass: TypeOrmBookingRepository }
+
+  Servis TypeORM bilmez; sadece `BookingRepository` inject eder. Testte mock,
+  ileride başka ORM adapter mümkün.
+
+  Aynı desen: Ticket, Trip, Contact, Transaction, Settlement vb.
+
+B) Harici servis (ödeme)
+
+  Port     : IPaymentProvider
+  Adapter  : BibsPayProvider implements IPaymentProvider
+  Registry : PaymentProviderRegistry — şirket config'indeki isme göre
+             ('bibspay') doğru adapter'ı verir.
+
+  Domain/orchestrator BibsPay detayını bilmez; sadece `queryStatus`,
+  `initiate3DPayment`, `refund` gibi ortak metodları çağırır.
+
+  Benzer dış adapter'lar: e-bilet, notifications, UETDS SOAP, Logo HR, tracking.
+
+────────────────────────────────────────────────────────────────────────────────
+3. Tek cümleyle akış
+
+  Controller (api)
+    → Domain Service (iş kuralı)
+      → Port (abstract repo / IPaymentProvider)
+        → Adapter (TypeORM / BibsPay)
+          → PostgreSQL / dış API
+
+Özet: API sadece yüz; domain işi kurar; infra dış dünyaya bağlanır. Domain port
+üzerinden konuşur, adapter o portu doldurur — bağımlılık domain'e değil,
+sözleşmeye (port'a) doğru.
+
+────────────────────────────────────────────────────────────────────────────────
+4. Neden böyle — hangi prensibe bağlanıyor
+
+- Dependency Inversion (SOLID'in D'si): üst seviye (domain) alt seviyeye
+  (TypeORM, BibsPay) değil, ikisi de soyutlamaya (port) bağlı.
+- Test edilebilirlik: portu mock'la, DB'siz test yaz.
+- Değiştirilebilirlik: ödeme sağlayıcısı değişirse sadece yeni adapter yazılır,
+  domain'e dokunulmaz. Registry sayesinde ikisi aynı anda da yaşayabilir.
+- Bedeli: dosya sayısı ve dolaylılık artar. Tek adapter'ı olan, değişmeyecek
+  bir bağımlılık için port yazmak fazladan yük — trade-off burada.
+
+Sorulacak sorular (çalışırken cevapla):
+- Her repository için port şart mı, yoksa sadece değişme ihtimali olanlar için mi?
+- Entity domain'e mi ait infra'ya mı? (TypeORM dekoratörleri entity'de olunca
+  domain gerçekten teknolojiden bağımsız mı kalıyor?)
+- Konu 1'deki `status` sorunu hangi katmanda çözülmeli — entity mi, domain mi,
+  api DTO'su mu?
+
+════════════════════════════════════════════════════════════════════════════════
+
+KONU 3 — Şablon + Override vs. Materialization (Ayar Kalıtımı)
+Katman: Katman 5 (veri modelleme + tutarlılık + okuma/yazma trade-off'u)
+Durum: Not Started (materyal hazır, çalışılacak)
+
+Somut senaryo:
+  Şirket X'in 100 ayarı var. X altında 200 şube var. Ayarlar şube seviyesinde
+  geçerli; şube isterse override edebilir. Servislerde ~100 farklı yerde bu
+  ayarlara bakılarak "yapabilir / yapamaz" kararı veriliyor.
+  Ayarlar sık okunuyor, nadiren yazılıyor.
+
+İki şık:
+  A) Şablon + Override (sparse) — ayar sadece şirkete yazılır; şubede yalnızca
+     sapma varsa satır olur. Okurken: şubeye bak, yoksa şirkete düş.
+  B) Materialization  — her şubeye 100 ayarın tamamı yazılır (200 × 100 =
+     20.000 satır). Okurken: tek yere bak.
+
+────────────────────────────────────────────────────────────────────────────────
+1. Önce yanlış parametreyi ele: depolama
+
+  200 şube × 100 ayar = 20.000 satır. Satır başına ~100 byte → ~2 MB.
+  Sparse'ta belki 1.000 satır → ~100 KB.
+
+  İkisi de hiçbir şey. Index de cache de her iki modelde zaten var (kullanıcı
+  notu: bu ikisi kararı ayırt etmiyor). Yani:
+
+    → Bu ölçekte depolama bir karar parametresi DEĞİL. Karar tamamen
+      semantik + operasyonel maliyet üzerinden verilir.
+
+  Ölçek değişirse hesap değişir: 200 değil 200.000 şube olsaydı, ya da 100
+  değil 10.000 ayar olsaydı, materialization'ın fan-out write'ı (tek şirket
+  ayarı değişiminde 200.000 satır UPDATE) lock/transaction süresi meselesine
+  dönerdi. Parametre "kaç satır" değil, "bir yazma kaç satıra dokunuyor".
+
+────────────────────────────────────────────────────────────────────────────────
+2. Asıl soru — ve bu teknik değil, ürün sorusu
+
+  Şirket ayarı CANLI bir üst değer mi, yoksa sadece OLUŞTURMA ANINDAKİ
+  varsayılan mı?
+
+  a) "Şirket ayarını değiştirdim, override etmeyen tüm şubeler anında yeni
+     değeri almalı."
+     → Şirket ayarı canlı üst değer. Doğru model: A (şablon + override).
+       B'yi seçersen bu davranışı fan-out write ile TAKLİT etmek zorundasın —
+       senkronizasyon kodu tam olarak buradan doğar. Yani "sync sorunu"
+       B'nin doğasında olan bir şey değil; yanlış modelle doğru semantiği
+       taklit etmeye çalışmanın bedeli.
+
+  b) "Şube açılırken şirketten kopyalanır, sonra kendi hayatını yaşar. Şirket
+     ayarının sonradan değişmesi mevcut şubeleri etkilemez."
+     → Şirket ayarı bir şablondur, üst değer değil. Doğru model: B, ve buna
+       'snapshot' de. Bu durumda senkronizasyon sorunu YOK — çünkü senkron
+       olmasını zaten istemiyorsun. Drift bug değil, tanım.
+
+  Refleks: "sync kodu yazmam gerekiyor" hissi geldiyse, çoğu zaman
+  (a) semantiğini (b) modeliyle kurmaya çalışıyorsundur. Önce hangi semantiği
+  istediğine karar ver; model ondan sonra neredeyse otomatik geliyor.
+
+────────────────────────────────────────────────────────────────────────────────
+3. Provenance: "bu değer nereden geliyor?"
+
+  Ürün şunları istiyor mu:
+    - UI'da "bu ayar şirketten miras / bu şubede override edilmiş" rozeti
+    - "Şirket varsayılanına dön" butonu
+
+  İstiyorsa: sparse model bunu bedavaya verir → satır varsa override, yoksa
+  miras. Materialization'da bu bilgiyi ayrıca `is_overridden` kolonuyla
+  taşımak zorundasın. O noktada zaten kalıtım bilgisini saklıyorsun, üstüne
+  bir de kopyayı taşıyorsun: iki kaynak → drift ihtimali.
+
+────────────────────────────────────────────────────────────────────────────────
+4. Sorgu şekli: tek şube mi, çapraz mı?
+
+  - "Bu isteği işlerken şu şubenin ayarları" (senaryoların %99'u)
+    → Resolution ucuz. İstek başında 1 kez yapılır. Model kararını etkilemez.
+
+  - "Hangi şubelerde X ayarı açık?" / "Y ayarı false olan şubeleri raporla"
+    → Materialize edilmiş tablo doğrudan indexlenebilir: WHERE key='x' AND value=true.
+      Sparse'ta bu bir LEFT JOIN + COALESCE olur; yapılabilir ama index
+      planlaması zorlaşır, "yokluk" da bir cevap olduğu için (miras = şirket
+      değeri) sorgu her zaman şirket tablosunu da içermeli.
+
+  Bu gerçek bir parametre. Ama çözümü "B'ye geç" değil → madde 6'ya bak.
+
+────────────────────────────────────────────────────────────────────────────────
+5. "100 yerde ayar okuyoruz" korkusu — model kararından bağımsız
+
+  Bu asıl acı nokta, ve şaşırtıcı biçimde A/B seçimiyle ilgisi yok. Çözüm
+  ikisinde de aynı: resolution'ı TEK yerde yap, sonucu istek boyunca taşı.
+
+    // istek başında bir kez
+    const settings = await settingsResolver.forBranch(branchId);
+    // → 1-2 sorgu, 100 ayarın hepsi çözülmüş düz bir nesne
+
+    // servislerde, 100 farklı yerde
+    if (settings.get('allowRefundAfterDeparture')) { ... }
+
+  Servis DB'ye bakmaz, değerin şubeden mi şirketten mi geldiğini bilmez.
+  Bu yapılırsa "her istekte iki yere bakacağız" endişesi buharlaşıyor: istek
+  başına 1-2 sorgu + geri kalan her şey RAM'den.
+
+  Bu aynı zamanda Konu 2'deki port/adapter fikri: depolama şekli bir
+  implementasyon detayı, domain sadece `settings.get()` görüyor. Yani
+  A → B geçişi (veya tersi) sonradan tek adapter değişikliği olur.
+  **Kararı ertelenebilir hâle getirmek, kararı doğru vermekten daha değerli.**
+
+  Cache: sık okunan + az yazılan → resolved sonucu cache'le (key: branchId).
+  Invalidation'da fark var: şirket ayarı değişince A'da o şirketin TÜM
+  şubelerinin cache'i düşmeli (tag/prefix invalidation). B'de de aynı — çünkü
+  fan-out write zaten hepsine dokunuyor. Yani cache de kararı ayırt etmiyor.
+
+────────────────────────────────────────────────────────────────────────────────
+6. Üçüncü yol: sparse source of truth + türetilmiş okuma modeli
+
+  En sık doğru olan kombinasyon:
+
+    Yazma tarafı  : kod default → şirket → şube  (sadece sapma saklanır)
+    Okuma tarafı  : gerekiyorsa resolved değerleri ayrı bir okuma tablosuna
+                    / materialized view'a türet
+
+  Kritik nokta: kopya TÜRETİLMİŞ (derived) ve yeniden üretilebilir. Tek
+  yazılabilir kaynak var. Drift olursa rebuild edersin.
+
+    → Bu, "drift"i bir bug sınıfından bir bakım işine indirger.
+      İki YAZILABILIR kaynak tutmak (A ve B'yi elle senkron tutmak) ise
+      gerçek tehlike — orada drift sessizce yanlış karar üretir.
+
+  Ayrıca kod-içi default katmanı (SETTING_DEFAULTS sabiti) yeni ayar eklemeyi
+  migration olmaktan çıkarır: yeni anahtar kodda tanımlanır, DB'de hiçbir şey
+  yazılmaz, tüm şirket ve şubeler otomatik alır.
+
+────────────────────────────────────────────────────────────────────────────────
+7. Şema evrimi — sessiz hataların çıktığı yer
+
+  Yeni bir ayar anahtarı eklendiğinde:
+    A) Şirkete 1 satır (veya kodda default). Şubeler otomatik alır. Yeni şube
+       açıldığında da otomatik.
+    B) 200 satırlık backfill migration. Her yeni ayar için. Her yeni şube için
+       copy. Unutulursa satır yok → okuma `undefined` → `if (undefined)` sessizce
+       false → yanlış iş kararı, hata fırlatmadan.
+
+  Ayar seti büyüyorsa bu tek başına A lehine ağır basar. B seçilecekse
+  "eksik satır" durumu mutlaka patlamalı (fail loud), sessiz default'a
+  düşmemeli.
+
+────────────────────────────────────────────────────────────────────────────────
+8. Karar kuralı (özet heuristic)
+
+  1. Şirket değeri değişince şubelere yansımalı mı?
+       Evet → sparse override (A). Source of truth sparse kalsın.
+       Hayır, "o anki değeri dondur" isteniyor → snapshot (B), bilinçli olarak.
+  2. Provenance / "varsayılana dön" gerekiyor mu? → A bedavaya verir.
+  3. Çapraz sorgu ihtiyacı var mı? → A + türetilmiş okuma tablosu. B'ye geçme.
+  4. Okuma maliyeti? → Her iki modelde de per-request resolver + cache.
+       Seçimi belirlemez, ama YAPILMASI ŞART.
+  5. Bir yazma kaç satıra dokunuyor? → B'de fan-out büyüdükçe transaction,
+       lock, kısmi başarısızlık ve idempotency sorunları başlar.
+  6. Ayar seti büyüyor mu? → Büyüyorsa A (backfill yükü yok).
+
+────────────────────────────────────────────────────────────────────────────────
+9. Karar öncesi kodda neye bakılmalı (ölçmeden karar verme)
+
+  - Ayar okuma noktalarını gerçekten SAY (grep). Gerçekten 100 mü, 12 mi?
+    Çoğu aynı 5 ayarı mı okuyor?
+  - Okuma granülaritesi: tek ayar mı, ayar grubu mu? Grup ise resolver zaten
+    tek çağrıda çözer.
+  - Yazma noktaları kaç tane, kim yazıyor (admin UI, migration, script)?
+  - Ürün tarafında "şirket ayarını toplu değiştir" senaryosu gerçekten
+    kullanılıyor mu, yoksa varsayım mı?
+  - Şu an şubelerin yüzde kaçı override ediyor? %5 ise sparse çok kazançlı;
+    %90 ise kalıtımın anlamı azalıyor — o zaman B daha dürüst bir model.
+  - Bir ayar bulunamadığında ne oluyor: sessizce false mu, exception mı?
+
+  Ölçmeden verilen karar tahmin; bu maddeler tahmini veriye çeviriyor.
+
+────────────────────────────────────────────────────────────────────────────────
+10. Genel prensip (bu problemin ötesi)
+
+  Bu problem "ayar" problemi değil, genel bir kalıp:
+  fiyat listesi + kampanya override, rol + kullanıcı bazlı izin override,
+  tema/config kalıtımı, feature flag + tenant override — hepsi aynı.
+
+  Üç cümlelik özet:
+    - Tek yazılabilir kaynak tut; kopya varsa TÜRETİLMİŞ olsun.
+    - Duplication'ın maliyeti yer değil, tutarlılıktır.
+    - Okuma maliyetini modelle değil, resolver + cache ile çöz.
